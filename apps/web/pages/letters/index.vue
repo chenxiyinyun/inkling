@@ -2,12 +2,15 @@
 import type { MyLetter } from '@inkling/shared';
 
 const api = useApi();
+const toast = useToast();
 const letters = ref<MyLetter[]>([]);
 const loading = ref(true);
 
 onMounted(async () => {
   try {
     letters.value = await api.get<MyLetter[]>('/letters');
+  } catch (e: any) {
+    toast.error(e.message);
   } finally {
     loading.value = false;
   }
@@ -19,11 +22,9 @@ onMounted(async () => {
     <h1 class="font-serif text-2xl font-700">我的信件</h1>
     <p class="mt-1 text-sm text-inkSoft">你寄出的每一份心意，都在路上。</p>
 
-    <div v-if="loading" class="mt-8 text-center text-inkFaint">展信中…</div>
+    <PageLoading v-if="loading" />
 
-    <div v-else-if="letters.length === 0" class="mt-16 text-center text-inkSoft font-serif">
-      还没有寄出过信。<br />写下第一封，交给大海吧。
-    </div>
+    <EmptyState v-else-if="letters.length === 0" icon="📭" title="还没有寄出过信。" hint="写下第一封，交给大海吧。" />
 
     <div v-else class="mt-5 space-y-3">
       <div v-for="l in letters" :key="l.letterId" class="card">

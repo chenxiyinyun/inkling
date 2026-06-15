@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@inkling/shared": "workspace:*",
+    "gsap": "^3.12.5",
     "pinia": "^2.2.4",
     "vue": "^3.5.11",
     "vue-router": "^4.4.5"

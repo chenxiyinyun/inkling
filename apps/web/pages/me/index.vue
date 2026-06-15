@@ -4,9 +4,16 @@ import { useAuthStore } from '~/stores/auth';
 
 const api = useApi();
 const auth = useAuthStore();
+const loading = ref(!auth.me);
 
 onMounted(async () => {
-  if (!auth.me) auth.setMe(await api.get('/me'));
+  if (!auth.me) {
+    try {
+      auth.setMe(await api.get('/me'));
+    } finally {
+      loading.value = false;
+    }
+  }
 });
 
 const ageTierLabel: Record<string, string> = { ADULT: '成年', TEEN: '未成年（守护中）', CHILD: '受限' };
@@ -16,7 +23,9 @@ const ageTierLabel: Record<string, string> = { ADULT: '成年', TEEN: '未成年
   <div class="pt-4">
     <h1 class="font-serif text-2xl font-700">我的</h1>
 
-    <div v-if="auth.me" class="card mt-5">
+    <PageLoading v-if="loading" />
+
+    <div v-else-if="auth.me" class="card mt-5">
       <div class="font-serif text-xl font-700">{{ auth.me.penName }}</div>
       <div class="mt-2 flex flex-wrap gap-1.5">
         <span class="chip">{{ auth.me.mbti === 'UNKNOWN' ? '型号待解' : auth.me.mbti }}</span>

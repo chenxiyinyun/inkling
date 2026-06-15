@@ -2,12 +2,15 @@
 import type { PenPalSummary } from '@inkling/shared';
 
 const api = useApi();
+const toast = useToast();
 const penpals = ref<PenPalSummary[]>([]);
 const loading = ref(true);
 
 onMounted(async () => {
   try {
     penpals.value = await api.get<PenPalSummary[]>('/penpals');
+  } catch (e: any) {
+    toast.error(e.message);
   } finally {
     loading.value = false;
   }
@@ -19,11 +22,9 @@ onMounted(async () => {
     <h1 class="font-serif text-2xl font-700">笔友信匣</h1>
     <p class="mt-1 text-sm text-inkSoft">与你结缘的人，慢慢往来。</p>
 
-    <div v-if="loading" class="mt-8 text-center text-inkFaint">展信中…</div>
+    <PageLoading v-if="loading" />
 
-    <div v-else-if="penpals.length === 0" class="mt-16 text-center text-inkSoft font-serif">
-      还没有笔友。<br />去漂流海，拆开一封信，回信结缘吧。
-    </div>
+    <EmptyState v-else-if="penpals.length === 0" icon="🕊" title="还没有笔友。" hint="去漂流海，拆开一封信，回信结缘吧。" />
 
     <div v-else class="mt-5 space-y-3">
       <NuxtLink v-for="p in penpals" :key="p.relationId" :to="`/penpals/${p.relationId}`" class="card flex items-center justify-between">

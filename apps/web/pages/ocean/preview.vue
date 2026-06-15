@@ -7,6 +7,7 @@ const quota = useQuotaStore();
 const ocean = useOceanStore();
 
 const busy = ref(false);
+const unsealing = ref(false);
 const error = ref('');
 
 onMounted(() => {
@@ -31,13 +32,19 @@ async function unseal() {
   if (!ocean.preview || quota.unseal <= 0) return;
   busy.value = true;
   error.value = '';
+  unsealing.value = true;
   try {
-    const full = await api.post<UnsealedLetter>(`/fishing/${ocean.preview.fishingId}/unseal`);
+    // 火漆拆封仪式与请求并行，给动画留出时间
+    const [full] = await Promise.all([
+      api.post<UnsealedLetter>(`/fishing/${ocean.preview.fishingId}/unseal`),
+      new Promise((r) => setTimeout(r, 950)),
+    ]);
     ocean.setUnsealed(full);
     await quota.load();
     await navigateTo('/ocean/read');
   } catch (e: any) {
     error.value = e.message;
+    unsealing.value = false; // 失败才收起仪式；成功则随页面跳转一起卸载
   } finally {
     busy.value = false;
   }
@@ -46,6 +53,7 @@ async function unseal() {
 
 <template>
   <div v-if="ocean.preview" class="pt-6">
+    <UnsealCeremony v-if="unsealing" />
     <LetterCard :preview="ocean.preview" />
 
     <p v-if="error" class="mt-3 text-sm text-terra">{{ error }}</p>

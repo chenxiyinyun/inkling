@@ -17,7 +17,11 @@ async function fish() {
   message.value = '';
   fishing.value = true;
   try {
-    const preview = await api.post<LetterPreview>('/ocean/fish');
+    // 抛竿动画与请求并行，给涟漪一点露出时间
+    const [preview] = await Promise.all([
+      api.post<LetterPreview>('/ocean/fish'),
+      new Promise((r) => setTimeout(r, 700)),
+    ]);
     ocean.setPreview(preview);
     await quota.load();
     await navigateTo('/ocean/preview');
@@ -32,7 +36,7 @@ async function fish() {
 
 <template>
   <div class="pt-8 text-center">
-    <div class="text-6xl mb-4 select-none">🌊</div>
+    <OceanScene :fishing="fishing" class="mb-4" />
     <h1 class="font-serif text-2xl font-700">漂流海</h1>
     <p class="mt-2 text-sm text-inkSoft">每一次打捞，都是一次未知的相遇。</p>
 
