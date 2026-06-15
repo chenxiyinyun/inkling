@@ -1,22 +1,15 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LetterStatus, ReviewAction, ReviewTargetType } from '@prisma/client';
-import { mbtiAffinity, MbtiValue, REPLY_WINDOW_DAYS, PREVIEW_LOCK_SECONDS } from '@inkling/shared';
+import { MbtiValue, REPLY_WINDOW_DAYS, PREVIEW_LOCK_SECONDS } from '@inkling/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { QuotaService } from '../quota/quota.service';
 import { ModerationService } from '../moderation/moderation.service';
 import { DeliveryService } from '../delivery/delivery.service';
 import { geohashDistanceKm, distanceLabel } from '../../common/geo/geohash.util';
+import { scoreCandidate } from './ocean-score';
 import { ReplyDto } from './dto/reply.dto';
-
-function jaccard(a: string[], b: string[]): number {
-  if (!a.length || !b.length) return 0;
-  const sa = new Set(a);
-  const inter = b.filter((x) => sa.has(x)).length;
-  const union = new Set([...a, ...b]).size;
-  return union ? inter / union : 0;
-}
 
 @Injectable()
 export class OceanService {
@@ -74,11 +67,14 @@ export class OceanService {
       .map((c) => {
         const cp = c.author.profile;
         const cTags = Array.isArray(cp?.interestTags) ? (cp!.interestTags as string[]) : [];
-        const aff = mbtiAffinity((me?.mbti ?? 'UNKNOWN') as MbtiValue, (cp?.mbti ?? 'UNKNOWN') as MbtiValue, pref);
-        const inter = jaccard(myTags, cTags);
-        const km = geohashDistanceKm(me?.geohash5, cp?.geohash5);
-        const geo = km == null ? 0.3 : Math.exp(-km / 150);
-        const score = 0.4 * aff + 0.35 * inter + 0.25 * geo;
+        const score = scoreCandidate({
+          myMbti: (me?.mbti ?? 'UNKNOWN') as MbtiValue,
+          candidateMbti: (cp?.mbti ?? 'UNKNOWN') as MbtiValue,
+          preference: pref,
+          myTags,
+          candidateTags: cTags,
+          distanceKm: geohashDistanceKm(me?.geohash5, cp?.geohash5),
+        });
         return { c, score };
       })
       .sort((a, b) => b.score - a.score);

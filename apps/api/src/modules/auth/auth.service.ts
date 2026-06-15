@@ -1,9 +1,10 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { AgeTier, ConsentStatus, User } from '@prisma/client';
+import { ConsentStatus, User } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { deriveAgeDecision } from './age.util';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -15,32 +16,22 @@ export class AuthService {
     private readonly config: ConfigService,
   ) {}
 
-  private calcAge(birthDate: Date): number {
-    const now = new Date();
-    let age = now.getFullYear() - birthDate.getFullYear();
-    const m = now.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && now.getDate() < birthDate.getDate())) age--;
-    return age;
-  }
-
   async register(dto: RegisterDto) {
     if (!dto.email && !dto.phone) {
       throw new BadRequestException({ code: 'IDENTIFIER_REQUIRED', message: '请提供邮箱或手机号' });
     }
 
-    const age = this.calcAge(new Date(dto.birthDate));
     const hardFloor = this.config.get<number>('minAgeHardFloor') ?? 13;
     const guardianBelow = this.config.get<number>('guardianModeBelowAge') ?? 18;
+    const { tier: ageTier, isMinor, belowFloor } = deriveAgeDecision(new Date(dto.birthDate), hardFloor, guardianBelow);
 
     // 年龄硬门控（未成年人保护，详见 docs/安全与未成年人保护.md）
-    if (age < hardFloor) {
+    if (belowFloor) {
       throw new ForbiddenException({
         code: 'AGE_BELOW_FLOOR',
         message: '漂流邮局暂时不能为你开启航行。待你长大些，海面会一直在。',
       });
     }
-    const isMinor = age < guardianBelow;
-    const ageTier: AgeTier = isMinor ? AgeTier.TEEN : AgeTier.ADULT;
 
     // 唯一性校验
     const existing = await this.prisma.user.findFirst({
