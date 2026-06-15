@@ -1,0 +1,385 @@
+// 信逢 Inkling · MVP 数据模型 (PostgreSQL 16)
+// 权威完整 DDL（含 PostGIS/索引细节）见 docs/数据库设计.md。
+// 本 schema 为可运行的 MVP 子集：地理用 GeoHash 字符串前缀，暂不上 PostGIS / pgvector。
+// ⚠️ 下列 enum 与 packages/shared/src/enums.ts 保持同步。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────── 枚举 ─────────────────
+
+enum UserStatus {
+  ACTIVE
+  FROZEN
+  BANNED
+}
+
+enum AgeTier {
+  CHILD
+  TEEN
+  ADULT
+}
+
+enum LetterStatus {
+  DRAFT
+  REVIEWING
+  DELIVERING
+  FLOATING
+  HOOKED
+  SEALED_OPEN
+  PAIRED
+  RECYCLED
+  DIMMED
+  ARCHIVED
+  FROZEN
+}
+
+enum DeliveryVehicle {
+  FOOT
+  CARRIAGE
+  PIGEON
+  FAST_HORSE
+  ALBATROSS
+}
+
+enum RelationStatus {
+  ACTIVE
+  DORMANT
+  ARCHIVED
+  BLOCKED
+}
+
+enum RiskLevel {
+  SAFE
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ReviewAction {
+  PASS
+  REVIEW
+  BLOCK
+}
+
+enum ReviewTargetType {
+  LETTER
+  CORRESPONDENCE
+  PROFILE
+}
+
+enum PenaltyType {
+  WARNING
+  RATE_LIMIT
+  FREEZE
+  BAN
+}
+
+enum Operator {
+  AI
+  HUMAN
+}
+
+enum ReportReason {
+  HARASSMENT
+  SEXUAL
+  CONTACT_INFO
+  SCAM
+  POLITICAL
+  SELF_HARM
+  MINOR_SAFETY
+  OTHER
+}
+
+enum ConsentStatus {
+  PENDING
+  GRANTED
+  REJECTED
+}
+
+enum DeletionStatus {
+  PENDING
+  PROCESSING
+  DONE
+}
+
+// ───────────────── 用户与资料 ─────────────────
+
+model User {
+  id           String     @id @default(cuid())
+  publicId     String     @unique @default(cuid())
+  email        String?    @unique
+  phone        String?    @unique
+  passwordHash String
+  status       UserStatus @default(ACTIVE)
+  ageTier      AgeTier
+  birthDate    DateTime? // 仅用于年龄保护，最小化存储
+  frozenUntil  DateTime?
+  lastActiveAt DateTime   @default(now())
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  profile         UserProfile?
+  parentalConsent ParentalConsent?
+  letters         Letter[]         @relation("LetterAuthor")
+  fishings        FishingRecord[]
+  unseals         UnsealRecord[]
+  relationsA      PenPalRelation[] @relation("RelationUserA")
+  relationsB      PenPalRelation[] @relation("RelationUserB")
+  correspondences Correspondence[]
+  quotas          DailyQuota[]
+  penalties       Penalty[]
+  reportsMade     Report[]         @relation("Reporter")
+  blocks          Block[]          @relation("Blocker")
+  blockedBy       Block[]          @relation("Blocked")
+  deletionReqs    DataDeletionRequest[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  userId          String   @id
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  penName         String
+  mbti            String   @default("UNKNOWN") // 自报；UNKNOWN = 不确定
+  interestTags    Json     @default("[]")
+  oneLiner        String?  @db.VarChar(60)
+  geohash5        String? // 仅粗粒度区域（±2.4km），不存精确经纬度
+  matchPreference Float    @default(0.5) // 0=最相似 1=最不一样
+  guardianMode    Boolean  @default(false)
+  invisible       Boolean  @default(false) // 闭关 / 隐身
+  reputation      Float    @default(0.5)
+  updatedAt       DateTime @updatedAt
+
+  @@index([geohash5])
+  @@index([mbti])
+  @@map("user_profiles")
+}
+
+model ParentalConsent {
+  id             String        @id @default(cuid())
+  userId         String        @unique
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  method         String // 自声明 / 信用卡 / 第三方年龄验证
+  guardianContact String?
+  jurisdiction   String? // GDPR-K / COPPA / PDPO / 個資法
+  status         ConsentStatus @default(PENDING)
+  grantedAt      DateTime?
+  createdAt      DateTime      @default(now())
+
+  @@map("parental_consents")
+}
+
+// ───────────────── 信件与漂流 ─────────────────
+
+model Letter {
+  id            String          @id @default(cuid())
+  publicId      String          @unique @default(cuid())
+  authorId      String
+  author        User            @relation("LetterAuthor", fields: [authorId], references: [id])
+  body          String
+  theme         String?
+  status        LetterStatus    @default(DRAFT)
+  version       Int             @default(0) // 乐观锁，根治拆封竞态
+  geohash5      String? // 投递时作者粗粒度区域（用于匹配/距离）
+  poolVisibleAt DateTime? // 审核+在途后入池时刻
+  expireAt      DateTime? // 漂流到期归档时刻
+  recycleCount  Int             @default(0)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  previewSnapshot PreviewSnapshot?
+  fishings        FishingRecord[]
+  unseals         UnsealRecord[]
+  deliveryTasks   DeliveryTask[]
+  relations       PenPalRelation[]
+
+  @@index([status, poolVisibleAt])
+  @@index([authorId])
+  @@index([geohash5])
+  @@map("letters")
+}
+
+model PreviewSnapshot {
+  letterId    String @id
+  letter      Letter @relation(fields: [letterId], references: [id], onDelete: Cascade)
+  partialTags Json   @default("[]")
+  bodyExcerpt String
+
+  @@map("preview_snapshots")
+}
+
+model FishingRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  letterId  String
+  letter    Letter   @relation(fields: [letterId], references: [id])
+  fishedAt  DateTime @default(now())
+  lockUntil DateTime
+  released  Boolean  @default(false)
+
+  // 同一封信不再被同一人打捞到
+  @@unique([userId, letterId])
+  @@index([letterId])
+  @@map("fishing_records")
+}
+
+model UnsealRecord {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  letterId      String
+  letter        Letter   @relation(fields: [letterId], references: [id])
+  unsealedAt    DateTime @default(now())
+  replyDeadline DateTime // 自送达起算 7 天
+  replied       Boolean  @default(false)
+
+  @@index([letterId])
+  @@index([replyDeadline])
+  @@map("unseal_records")
+}
+
+// ───────────────── 笔友关系 ─────────────────
+
+model PenPalRelation {
+  id            String         @id @default(cuid())
+  publicId      String         @unique @default(cuid())
+  userAId       String
+  userA         User           @relation("RelationUserA", fields: [userAId], references: [id])
+  userBId       String
+  userB         User           @relation("RelationUserB", fields: [userBId], references: [id])
+  sourceLetterId String?
+  sourceLetter  Letter?        @relation(fields: [sourceLetterId], references: [id])
+  status        RelationStatus @default(ACTIVE)
+  exchangeCount Int            @default(0)
+  intimacy      Float          @default(0)
+  lastLetterAt  DateTime?
+  createdAt     DateTime       @default(now())
+
+  correspondences Correspondence[]
+
+  @@unique([userAId, userBId])
+  @@map("pen_pal_relations")
+}
+
+model Correspondence {
+  id           String         @id @default(cuid())
+  relationId   String
+  relation     PenPalRelation @relation(fields: [relationId], references: [id], onDelete: Cascade)
+  senderId     String
+  sender       User           @relation(fields: [senderId], references: [id])
+  body         String
+  reviewStatus ReviewAction   @default(PASS)
+  deliverAt    DateTime? // 笔友往来仍保留在途延迟
+  deliveredAt  DateTime?
+  createdAt    DateTime       @default(now())
+
+  @@index([relationId])
+  @@map("correspondences")
+}
+
+// ───────────────── 递送 / 配额 ─────────────────
+
+model DeliveryTask {
+  id              String          @id @default(cuid())
+  letterId        String?
+  letter          Letter?         @relation(fields: [letterId], references: [id])
+  correspondenceId String?
+  vehicle         DeliveryVehicle
+  distanceKm      Float           @default(0)
+  departAt        DateTime        @default(now())
+  etaAt           DateTime
+  arrivedAt       DateTime?
+
+  @@index([etaAt, arrivedAt])
+  @@map("delivery_tasks")
+}
+
+model DailyQuota {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date       String // YYYY-MM-DD（按用户时区或 UTC 自然日）
+  sendLeft   Int
+  fishLeft   Int
+  unsealLeft Int
+
+  @@unique([userId, date])
+  @@map("daily_quotas")
+}
+
+// ───────────────── 安全 / 风控 ─────────────────
+
+model ContentReview {
+  id         String           @id @default(cuid())
+  targetType ReviewTargetType
+  targetId   String
+  risk       RiskLevel
+  action     ReviewAction
+  hits       Json             @default("[]") // 命中规则/类别（脱敏）
+  createdAt  DateTime         @default(now())
+
+  @@index([targetType, targetId])
+  @@map("content_reviews")
+}
+
+model Penalty {
+  id              String      @id @default(cuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id])
+  type            PenaltyType
+  reason          String
+  relatedReviewId String?
+  operator        Operator    @default(AI)
+  startsAt        DateTime    @default(now())
+  endsAt          DateTime?
+
+  @@index([userId])
+  @@map("penalties")
+}
+
+model Report {
+  id           String       @id @default(cuid())
+  reporterId   String
+  reporter     User         @relation("Reporter", fields: [reporterId], references: [id])
+  targetUserId String
+  targetType   ReviewTargetType?
+  targetId     String?
+  reason       ReportReason
+  detail       String?
+  status       String       @default("OPEN")
+  createdAt    DateTime     @default(now())
+
+  @@index([targetUserId])
+  @@map("reports")
+}
+
+model Block {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation("Blocker", fields: [userId], references: [id])
+  targetUserId String
+  target       User     @relation("Blocked", fields: [targetUserId], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, targetUserId])
+  @@map("blocks")
+}
+
+model DataDeletionRequest {
+  id          String         @id @default(cuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      DeletionStatus @default(PENDING)
+  requestedAt DateTime       @default(now())
+  processedAt DateTime?
+
+  @@map("data_deletion_requests")
+}

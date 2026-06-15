@@ -1,0 +1,44 @@
+# 本地开发依赖：PostgreSQL 16 + Redis 7
+# 用法：docker compose up -d
+# 若本机无 Docker，可改用本地安装的 PostgreSQL/Redis，并相应修改 .env 中的连接串。
+# 注：MVP 暂以 @nestjs/schedule 轮询实现时间驱动逻辑，未强依赖 RabbitMQ；
+#     生产期可启用下方注释的 rabbitmq 服务做延时队列。
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: inkling-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: inkling
+      POSTGRES_PASSWORD: inkling
+      POSTGRES_DB: inkling
+    ports:
+      - '5432:5432'
+    volumes:
+      - inkling-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U inkling']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: inkling-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - inkling-redis:/data
+
+  # rabbitmq:
+  #   image: rabbitmq:3.13-management-alpine
+  #   container_name: inkling-rabbitmq
+  #   restart: unless-stopped
+  #   ports:
+  #     - '5672:5672'
+  #     - '15672:15672'
+
+volumes:
+  inkling-pg:
+  inkling-redis:
