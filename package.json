@@ -17,10 +17,13 @@
     "db:migrate": "pnpm --filter @inkling/api prisma:migrate",
     "db:seed": "pnpm --filter @inkling/api prisma:seed",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

@@ -52,12 +52,19 @@ export class QuotaService {
     }
   }
 
-  /** 退还（用于操作回滚）。 */
+  /**
+   * 退还（用于操作回滚）。
+   * 仅当当前余额低于当日上限时 +1（clamp，防重复退还涨破上限）；
+   * 先 ensureToday，避免跨自然日退还落不到行而静默丢失。
+   */
   async refund(userId: string, kind: QuotaKind): Promise<void> {
+    await this.ensureToday(userId);
     const date = this.today();
     const field = `${kind}Left` as const;
+    const q = this.config.get<{ send: number; fish: number; unseal: number }>('quota')!;
+    const cap = q[kind];
     await this.prisma.dailyQuota.updateMany({
-      where: { userId, date },
+      where: { userId, date, [field]: { lt: cap } },
       data: { [field]: { increment: 1 } },
     });
   }

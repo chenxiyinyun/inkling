@@ -1,11 +1,12 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { LetterStatus, ReviewAction, ReviewTargetType } from '@prisma/client';
-import { PREVIEW_BODY_CHARS, MBTI_LABELS_ZH } from '@inkling/shared';
+import { MBTI_LABELS_ZH } from '@inkling/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
 import { QuotaService } from '../quota/quota.service';
 import { DeliveryService } from '../delivery/delivery.service';
 import { CreateLetterDto } from './dto/create-letter.dto';
+import { excerpt } from './letter-excerpt.util';
 
 const DRIFT_LABELS: Record<LetterStatus, string> = {
   DRAFT: '草稿',
@@ -30,12 +31,6 @@ export class LettersService {
     private readonly delivery: DeliveryService,
   ) {}
 
-  private excerpt(body: string): string {
-    const firstStop = body.search(/[。！？!?\n]/);
-    if (firstStop > 0 && firstStop <= PREVIEW_BODY_CHARS) return body.slice(0, firstStop + 1);
-    return body.length > PREVIEW_BODY_CHARS ? body.slice(0, PREVIEW_BODY_CHARS) + '…' : body;
-  }
-
   async createDraft(userId: string, dto: CreateLetterDto) {
     const letter = await this.prisma.letter.create({
       data: { authorId: userId, body: dto.body, theme: dto.theme, status: LetterStatus.DRAFT },
@@ -52,10 +47,11 @@ export class LettersService {
       throw new BadRequestException({ code: 'ALREADY_SUBMITTED', message: '这封信已经寄出了' });
     }
 
-    // 1) 审核（高危秒级先行拦截）
+    // 1) 审核（高危秒级先行拦截；BLOCK 与 REVIEW 都不放行——MVP 无人工复核队列，
+    //    脏词/不友善内容一律退回修改，杜绝静默通过。详见 docs/代码审计与迭代计划.md §1）
     const result = this.moderation.review(letter.body);
     await this.moderation.logReview(ReviewTargetType.LETTER, letter.id, result);
-    if (result.action === ReviewAction.BLOCK) {
+    if (result.action !== ReviewAction.PASS) {
       throw new BadRequestException({
         code: 'CONTENT_BLOCKED',
         message: '这封信里似乎有联系方式或不友善的内容，修改后可以重新寄出',
@@ -83,8 +79,8 @@ export class LettersService {
       }),
       this.prisma.previewSnapshot.upsert({
         where: { letterId: letter.id },
-        create: { letterId: letter.id, partialTags, bodyExcerpt: this.excerpt(letter.body) },
-        update: { partialTags, bodyExcerpt: this.excerpt(letter.body) },
+        create: { letterId: letter.id, partialTags, bodyExcerpt: excerpt(letter.body) },
+        update: { partialTags, bodyExcerpt: excerpt(letter.body) },
       }),
     ]);
 
@@ -105,7 +101,7 @@ export class LettersService {
     return letters.map((l) => ({
       letterId: l.publicId,
       status: l.status,
-      bodyExcerpt: this.excerpt(l.body),
+      bodyExcerpt: excerpt(l.body),
       driftLabel: DRIFT_LABELS[l.status],
       createdAt: l.createdAt.toISOString(),
     }));

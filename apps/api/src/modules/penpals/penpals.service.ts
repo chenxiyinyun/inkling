@@ -26,6 +26,14 @@ export class PenpalsService {
     };
   }
 
+  private async isBlockedBetween(aId: string, bId: string): Promise<boolean> {
+    const block = await this.prisma.block.findFirst({
+      where: { OR: [{ userId: aId, targetUserId: bId }, { userId: bId, targetUserId: aId }] },
+      select: { id: true },
+    });
+    return !!block;
+  }
+
   private async loadRelation(userId: string, publicId: string) {
     const rel = await this.prisma.penPalRelation.findUnique({
       where: { publicId },
@@ -101,9 +109,15 @@ export class PenpalsService {
       throw new ForbiddenException({ code: 'RELATION_CLOSED', message: '这段信缘已封存' });
     }
 
+    // 双向拉黑则不得再发信（关系状态可能尚未同步为 BLOCKED，直接查 Block 表兜底）
+    const partnerId = rel.userAId === userId ? rel.userBId : rel.userAId;
+    if (await this.isBlockedBetween(userId, partnerId)) {
+      throw new ForbiddenException({ code: 'RELATION_BLOCKED', message: '你与对方之间已无法通信' });
+    }
+
     const result = this.moderation.review(dto.body);
     await this.moderation.logReview(ReviewTargetType.CORRESPONDENCE, rel.id, result);
-    if (result.action === ReviewAction.BLOCK) {
+    if (result.action !== ReviewAction.PASS) {
       throw new BadRequestException({ code: 'CONTENT_BLOCKED', message: '信里似乎有联系方式或不友善的内容，修改后再寄出' });
     }
 

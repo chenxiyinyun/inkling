@@ -172,7 +172,8 @@ export class OceanService {
       throw new BadRequestException({ code: 'UNSEAL_BUSY', message: '这封信正被处理，稍候再试' });
     }
     try {
-      // CAS：HOOKED → SEALED_OPEN（version 自增，根治双拆封）
+      // CAS：HOOKED → SEALED_OPEN。并发互斥真正靠 `where: { status: HOOKED }`（只有一个请求能命中）；
+      // version 自增仅作变更审计，Redis 锁是第二道闸。双拆封由这三者共同杜绝。
       const res = await this.prisma.letter.updateMany({
         where: { id: fishing.letterId, status: LetterStatus.HOOKED },
         data: { status: LetterStatus.SEALED_OPEN, version: { increment: 1 } },
@@ -221,11 +222,17 @@ export class OceanService {
 
     const result = this.moderation.review(dto.body);
     await this.moderation.logReview(ReviewTargetType.CORRESPONDENCE, unseal.id, result);
-    if (result.action === ReviewAction.BLOCK) {
+    if (result.action !== ReviewAction.PASS) {
       throw new BadRequestException({ code: 'CONTENT_BLOCKED', message: '回信里似乎有联系方式或不友善的内容，修改后再寄出' });
     }
 
     const authorId = unseal.letter.authorId;
+    // 双向拉黑则不得结缘
+    const blocked = await this.blockedUserIds(userId);
+    if (blocked.includes(authorId)) {
+      throw new ForbiddenException({ code: 'BLOCKED', message: '你与对方之间已无法建立联系' });
+    }
+
     // 距离 → 笔友往来递送
     const [aProf, bProf] = await Promise.all([
       this.prisma.userProfile.findUnique({ where: { userId: authorId } }),
@@ -235,6 +242,16 @@ export class OceanService {
     const { deliverAt } = this.delivery.correspondenceDelivery(km);
 
     const relation = await this.prisma.$transaction(async (tx) => {
+      // 条件更新 + count 校验：与 scheduler 的 7 天回收存在竞态，
+      // 若信已被回池/归档（不再 SEALED_OPEN），这里 count===0 → 抛错回滚整个事务，
+      // 杜绝"已回池的信被回信复活成 PAIRED"。见 docs/代码审计与迭代计划.md §1。
+      const paired = await tx.letter.updateMany({
+        where: { id: unseal.letterId, status: LetterStatus.SEALED_OPEN },
+        data: { status: LetterStatus.PAIRED },
+      });
+      if (paired.count === 0) {
+        throw new BadRequestException({ code: 'WINDOW_CLOSED', message: '回信潮汐已过，信重新漂回了海面' });
+      }
       const rel = await tx.penPalRelation.upsert({
         where: { userAId_userBId: { userAId: authorId, userBId: userId } },
         create: { userAId: authorId, userBId: userId, sourceLetterId: unseal.letterId, exchangeCount: 1, lastLetterAt: new Date() },
@@ -243,7 +260,6 @@ export class OceanService {
       await tx.correspondence.create({
         data: { relationId: rel.id, senderId: userId, body: dto.body, reviewStatus: result.action, deliverAt },
       });
-      await tx.letter.update({ where: { id: unseal.letterId }, data: { status: LetterStatus.PAIRED } });
       await tx.unsealRecord.update({ where: { id: unseal.id }, data: { replied: true } });
       return rel;
     });

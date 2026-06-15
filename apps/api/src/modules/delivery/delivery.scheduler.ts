@@ -47,12 +47,9 @@ export class DeliveryScheduler {
       select: { id: true, letterId: true },
       take: 200,
     });
+    // 仅处理仍 HOOKED 的预览锁——已拆封的信是 SEALED_OPEN，不会进入此列表，
+    // 故无需再判断是否存在 unsealRecord（原分支为死代码，已移除）。
     for (const f of expired) {
-      const unsealed = await this.prisma.unsealRecord.findFirst({ where: { letterId: f.letterId } });
-      if (unsealed) {
-        await this.prisma.fishingRecord.update({ where: { id: f.id }, data: { released: true } });
-        continue;
-      }
       await this.prisma.$transaction([
         this.prisma.letter.updateMany({
           where: { id: f.letterId, status: LetterStatus.HOOKED },
