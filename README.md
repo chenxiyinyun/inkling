@@ -15,6 +15,21 @@
 
 ## 快速开始
 
+### 🅰 纯前端体验（无需后端 / 数据库，最快）
+
+想先"玩到"产品，不必起 API/PG/Redis —— 前端自带一层**内存假后端**（开发态默认开启）：
+
+```bash
+pnpm install
+pnpm build:shared            # 前端依赖共享包
+pnpm dev:web                 # 仅启动 web(:3000)
+```
+
+打开 http://localhost:3000 → 账号密码随便填即可登录 → 完善名片 → 漂流海打捞 4 封种子信 → 拆封 → 回信结缘 → 笔友往来。配额（1 投 / 3 捞 / 1 拆）会真实递减，状态存在 sessionStorage（刷新不丢，关标签页即清）。
+接真实后端时设 `NUXT_PUBLIC_USE_MOCK=0`。实现见 [apps/web/mocks/](apps/web/mocks/)。
+
+### 🅱 全栈本地联调
+
 ### 0. 前置：PostgreSQL 16 + Redis 7
 
 有 Docker：
@@ -55,6 +70,13 @@ pnpm dev:web
 > 演示提示：`.env` 里 `LETTER_POOL_DELAY_SECONDS`（默认 30s）控制"投递→漂入海面"的等待；
 > `CORRESPONDENCE_DELIVER_SECONDS`（默认 60s）控制笔友往来的"在途"时长。生产期按真实距离精算。
 
+## 测试
+
+```bash
+pnpm test                    # Vitest：纯逻辑 + service 回归（无需 DB，70+ 用例）
+pnpm typecheck               # 全包类型检查
+```
+
 ## 目录结构
 
 ```
@@ -70,7 +92,9 @@ inkling/
 │   └── web/                 # Nuxt 3 前端
 │       ├── pages/           # 登录 / 引导 / 漂流海 / 我的信件 / 笔友信匣 / 我的
 │       ├── components/      # TabBar / AppHeader / LetterCard
-│       └── stores/          # auth / quota / ocean (Pinia)
+│       ├── stores/          # auth / quota / ocean (Pinia)
+│       ├── mocks/           # 内存假后端（无需 API 即可联调，开发态默认开启）
+│       └── plugins/         # mock.client.ts 注入假后端
 ├── packages/shared/         # 共享枚举/常量/类型/MBTI
 └── docs/                    # 产品设计、数据库、API、安全、合规等文档
 ```
