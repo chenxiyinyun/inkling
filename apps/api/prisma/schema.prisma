@@ -26,18 +26,21 @@ enum AgeTier {
   ADULT
 }
 
+// 注：REVIEWING/RECYCLED/DIMMED/FROZEN 为「预留态」——对应路线图功能（审核队列/回池/降权/封禁），
+// MVP 暂无代码写入它们（回池用 FLOATING + recycleCount 表达）。保留以免日后再做破坏性枚举重建。
+// 与 packages/shared/src/enums.ts 的成员集合由 enum-drift.spec.ts 断言一致。
 enum LetterStatus {
   DRAFT
-  REVIEWING
+  REVIEWING // 预留：异步/人工审核队列态（MVP 同步审核，不写入）
   DELIVERING
   FLOATING
   HOOKED
   SEALED_OPEN
   PAIRED
-  RECYCLED
-  DIMMED
+  RECYCLED // 预留：MVP 回池改用 FLOATING + recycleCount，不写入
+  DIMMED // 预留：多次回池降权态（archive 查询已兼容读取，但无写入方）
   ARCHIVED
-  FROZEN
+  FROZEN // 预留：违规冻结态（MVP 不写入）
 }
 
 enum DeliveryVehicle {
@@ -237,9 +240,10 @@ model UnsealRecord {
   user          User     @relation(fields: [userId], references: [id])
   letterId      String
   letter        Letter   @relation(fields: [letterId], references: [id])
-  unsealedAt    DateTime @default(now())
+  unsealedAt    DateTime  @default(now())
   replyDeadline DateTime // 自送达起算 7 天
-  replied       Boolean  @default(false)
+  replied       Boolean   @default(false)
+  recycledAt    DateTime? // 回信窗口过期被 scheduler 回收/归档的时刻（null=仍在窗口内或已回信）
 
   @@index([letterId])
   @@index([replyDeadline])

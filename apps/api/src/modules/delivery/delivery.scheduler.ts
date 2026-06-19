@@ -64,17 +64,26 @@ export class DeliveryScheduler {
   private async recycleExpiredUnseals(now: Date) {
     const maxRecycle = this.config.get<number>('letterMaxRecycle') ?? 3;
     const expired = await this.prisma.unsealRecord.findMany({
-      where: { replied: false, replyDeadline: { lte: now }, letter: { status: LetterStatus.SEALED_OPEN } },
-      select: { letterId: true, letter: { select: { recycleCount: true } } },
+      // recycledAt: null —— 已回收的拆封记录不再重复处理（消除"旧记录永久残留/二次回收"漂移）
+      where: { replied: false, recycledAt: null, replyDeadline: { lte: now }, letter: { status: LetterStatus.SEALED_OPEN } },
+      select: { id: true, letterId: true, letter: { select: { recycleCount: true } } },
       take: 200,
     });
     for (const u of expired) {
       const nextCount = (u.letter?.recycleCount ?? 0) + 1;
       const nextStatus = nextCount >= maxRecycle ? LetterStatus.ARCHIVED : LetterStatus.FLOATING;
-      await this.prisma.letter.updateMany({
-        where: { id: u.letterId, status: LetterStatus.SEALED_OPEN },
-        data: { status: nextStatus, recycleCount: nextCount, poolVisibleAt: now },
-      });
+      // 回池/归档信件的同时标记本次拆封已回收：原子事务 + 条件守卫，
+      // 与「回信结缘」存在竞态时两条 updateMany 均 count=0（信已 PAIRED / 拆封已 replied），故不会误标。
+      await this.prisma.$transaction([
+        this.prisma.letter.updateMany({
+          where: { id: u.letterId, status: LetterStatus.SEALED_OPEN },
+          data: { status: nextStatus, recycleCount: nextCount, poolVisibleAt: now },
+        }),
+        this.prisma.unsealRecord.updateMany({
+          where: { id: u.id, replied: false, recycledAt: null },
+          data: { recycledAt: now },
+        }),
+      ]);
     }
   }
 

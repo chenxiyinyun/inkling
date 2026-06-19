@@ -67,7 +67,7 @@ describe('时间驱动状态机 scheduler.tick()（真实 PG）', () => {
       recycleCount: 0,
       expireAt: FUTURE(),
     });
-    await prisma.unsealRecord.create({ data: { userId: reader.id, letterId: l1.id, replyDeadline: PAST(), replied: false } });
+    const ur1 = await prisma.unsealRecord.create({ data: { userId: reader.id, letterId: l1.id, replyDeadline: PAST(), replied: false } });
 
     // 达上限（默认 3）：归档
     const l2 = await createLetter(app, author.id, {
@@ -75,7 +75,7 @@ describe('时间驱动状态机 scheduler.tick()（真实 PG）', () => {
       recycleCount: 2,
       expireAt: FUTURE(),
     });
-    await prisma.unsealRecord.create({ data: { userId: reader.id, letterId: l2.id, replyDeadline: PAST(), replied: false } });
+    const ur2 = await prisma.unsealRecord.create({ data: { userId: reader.id, letterId: l2.id, replyDeadline: PAST(), replied: false } });
 
     await scheduler.tick();
 
@@ -86,6 +86,10 @@ describe('时间驱动状态机 scheduler.tick()（真实 PG）', () => {
     const a2 = await prisma.letter.findUnique({ where: { id: l2.id } });
     expect(a2?.status).toBe(LetterStatus.ARCHIVED);
     expect(a2?.recycleCount).toBe(3);
+
+    // 两封信的拆封记录都被标记 recycledAt（消除旧记录永久残留 / 二次回收漂移）
+    expect((await prisma.unsealRecord.findUnique({ where: { id: ur1.id } }))?.recycledAt).not.toBeNull();
+    expect((await prisma.unsealRecord.findUnique({ where: { id: ur2.id } }))?.recycledAt).not.toBeNull();
   });
 
   it('笔友往来：在途到点 → 标记送达', async () => {

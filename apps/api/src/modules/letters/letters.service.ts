@@ -43,7 +43,8 @@ export class LettersService {
     const letter = await this.prisma.letter.findUnique({ where: { publicId } });
     if (!letter) throw new NotFoundException({ code: 'LETTER_NOT_FOUND', message: '找不到这封信' });
     if (letter.authorId !== userId) throw new ForbiddenException({ code: 'NOT_AUTHOR', message: '这不是你的信' });
-    if (letter.status !== LetterStatus.DRAFT && letter.status !== LetterStatus.REVIEWING) {
+    // 仅草稿可提交（REVIEWING 为预留态，MVP 无写入方，故不在此放行）
+    if (letter.status !== LetterStatus.DRAFT) {
       throw new BadRequestException({ code: 'ALREADY_SUBMITTED', message: '这封信已经寄出了' });
     }
 
