@@ -15,14 +15,19 @@
     "build:shared": "pnpm --filter @inkling/shared build",
     "db:generate": "pnpm --filter @inkling/api prisma:generate",
     "db:migrate": "pnpm --filter @inkling/api prisma:migrate",
+    "db:deploy": "pnpm --filter @inkling/api prisma:deploy",
     "db:seed": "pnpm --filter @inkling/api prisma:seed",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "devDependencies": {
+    "@swc/core": "^1.7.26",
+    "dotenv": "^16.4.5",
     "typescript": "^5.6.3",
+    "unplugin-swc": "^1.5.1",
     "vitest": "^2.1.9"
   },
   "pnpm": {
@@ -34,6 +39,7 @@
       "@parcel/watcher",
       "@prisma/client",
       "@prisma/engines",
+      "@swc/core",
       "esbuild",
       "prisma",
       "vue-demi"

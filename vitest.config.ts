@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, configDefaults } from 'vitest/config';
 import { resolve } from 'node:path';
 
 /**
@@ -16,5 +16,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['packages/**/src/**/*.spec.ts', 'apps/api/src/**/*.spec.ts'],
+    // DB 集成/e2e 用例（apps/api/test/**.e2e.spec.ts）走 vitest.integration.config.ts，
+    // 不混进零基建的 `pnpm test`，保证默认测试无需 DB/Redis。
+    exclude: [...configDefaults.exclude, 'apps/api/test/**', '**/*.e2e.spec.ts'],
   },
 });

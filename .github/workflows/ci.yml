@@ -1,0 +1,75 @@
+name: CI
+
+# 「真机部署(花钱) ≠ 联调测试(免费)」——本工作流在 GitHub 免费额度内完成
+# 单元 + 类型检查（零基建）与 集成/e2e（PG+Redis services 容器）两档验证。
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: 单元测试 + 类型检查（A 档·零基建）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:shared
+      - run: pnpm db:generate
+      - run: pnpm --filter @inkling/api typecheck
+      - run: pnpm --filter @inkling/api typecheck:test
+      - run: pnpm test
+
+  integration:
+    name: 集成 / e2e（B 档·PG + Redis services）
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: inkling
+          POSTGRES_PASSWORD: inkling
+          POSTGRES_DB: inkling_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U inkling"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://inkling:inkling@localhost:5432/inkling_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-test-secret-please-change-to-a-long-random-string
+      LETTER_POOL_DELAY_SECONDS: '0'
+      CORRESPONDENCE_DELIVER_SECONDS: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:shared
+      - run: pnpm db:generate
+      - run: pnpm db:deploy # prisma migrate deploy → 应用首个 migration 建 inkling_test
+      - run: pnpm test:integration

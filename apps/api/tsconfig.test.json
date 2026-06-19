@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false,
+    "composite": false
+  },
+  "// 说明": "只编 test/**，其引用的 src 生产代码会被传递性纳入并类型检查；不收录 src 下的 *.spec.ts（沿用主 tsconfig 不严检单测的惯例）",
+  "include": ["test/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
