@@ -24,12 +24,13 @@ function makeLetters() {
   };
   const moderation = {
     review: vi.fn(() => ({ risk: 'SAFE', action: ReviewAction.PASS, hits: [] })),
-    logReview: vi.fn().mockResolvedValue(undefined),
+    logReview: vi.fn().mockResolvedValue('rev1'),
   };
+  const penalty = { recordContentBlock: vi.fn().mockResolvedValue(undefined) };
   const quota = { consume: vi.fn().mockResolvedValue(undefined) };
   const delivery = { poolVisibleAt: vi.fn(() => new Date()), expireAt: vi.fn(() => new Date()) };
-  const service = new LettersService(prisma, moderation as any, quota as any, delivery as any);
-  return { service, prisma, moderation, quota };
+  const service = new LettersService(prisma, moderation as any, penalty as any, quota as any, delivery as any);
+  return { service, prisma, moderation, penalty, quota };
 }
 
 describe('LettersService.submit', () => {
@@ -45,19 +46,21 @@ describe('LettersService.submit', () => {
     expect(ctx.prisma.$transaction).toHaveBeenCalled();
   });
 
-  it('[P0] 中危 REVIEW → CONTENT_BLOCKED，且不扣投递配额', async () => {
+  it('[P0] 中危 REVIEW → CONTENT_BLOCKED，不扣投递配额，且不记处罚（仅退回修改）', async () => {
     ctx.moderation.review.mockReturnValue({ risk: 'MEDIUM', action: ReviewAction.REVIEW, hits: ['unfriendly:滚'] });
     await expect(ctx.service.submit('me', 'p1')).rejects.toMatchObject({
       response: { code: 'CONTENT_BLOCKED' },
     });
     expect(ctx.quota.consume).not.toHaveBeenCalled();
+    expect(ctx.penalty.recordContentBlock).not.toHaveBeenCalled();
   });
 
-  it('高危 BLOCK → CONTENT_BLOCKED，且不扣投递配额', async () => {
+  it('高危 BLOCK → CONTENT_BLOCKED，不扣配额，且记一条处罚', async () => {
     ctx.moderation.review.mockReturnValue({ risk: 'HIGH', action: ReviewAction.BLOCK, hits: ['contact:邮箱'] });
     await expect(ctx.service.submit('me', 'p1')).rejects.toMatchObject({
       response: { code: 'CONTENT_BLOCKED' },
     });
     expect(ctx.quota.consume).not.toHaveBeenCalled();
+    expect(ctx.penalty.recordContentBlock).toHaveBeenCalledWith('me', 'rev1');
   });
 });

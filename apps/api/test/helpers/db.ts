@@ -5,6 +5,8 @@ import { RedisService } from '../../src/common/redis/redis.service';
 // 全部业务表（@@map 后的实际表名）。子 → 父排序；TRUNCATE ... CASCADE 其实不依赖顺序，
 // 列全只为可读 + 万一改用 deleteMany 时备用。
 const TABLES = [
+  'notifications',
+  'appeals',
   'data_deletion_requests',
   'blocks',
   'reports',

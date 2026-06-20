@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { ReportsService } from './reports.service';
 import { CreateReportDto } from './dto/create-report.dto';
+import { CreateAppealDto } from './dto/create-appeal.dto';
 
 @Controller()
 export class ReportsController {
@@ -28,8 +29,8 @@ export class ReportsController {
   }
 
   @Post('appeals')
-  appeal(@CurrentUser() user: AuthUser, @Body('detail') detail: string) {
-    return this.reports.appeal(user.userId, detail);
+  appeal(@CurrentUser() user: AuthUser, @Body() dto: CreateAppealDto) {
+    return this.reports.appeal(user.userId, dto);
   }
 
   @Get('me/penalties')

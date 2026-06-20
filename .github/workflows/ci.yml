@@ -60,7 +60,7 @@ jobs:
       REDIS_URL: redis://localhost:6379
       JWT_SECRET: ci-test-secret-please-change-to-a-long-random-string
       LETTER_POOL_DELAY_SECONDS: '0'
-      CORRESPONDENCE_DELIVER_SECONDS: '0'
+      DELIVERY_HOURS_SCALE: '0'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

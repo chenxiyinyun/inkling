@@ -11,7 +11,7 @@ process.env.DATABASE_URL ??= 'postgresql://inkling:inkling@localhost:5432/inklin
 process.env.REDIS_URL ??= 'redis://localhost:6379';
 process.env.JWT_SECRET ??= 'test-secret-please-change';
 process.env.LETTER_POOL_DELAY_SECONDS ??= '0';
-process.env.CORRESPONDENCE_DELIVER_SECONDS ??= '0';
+process.env.DELIVERY_HOURS_SCALE ??= '0'; // 笔友往来在途即时（baseHours × 0），测试不等待
 
 // 安全闸：集成测试会 TRUNCATE 所有表，绝不能误连到开发/生产库。
 // 要求库名包含 "test"（默认 inkling_test 已满足）。

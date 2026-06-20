@@ -1,11 +1,13 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { LetterStatus, ReviewAction, ReviewTargetType } from '@prisma/client';
+import { LetterStatus, NotificationType, ReviewAction, ReviewTargetType } from '@prisma/client';
 import { MbtiValue, REPLY_WINDOW_DAYS, PREVIEW_LOCK_SECONDS } from '@inkling/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { QuotaService } from '../quota/quota.service';
 import { ModerationService } from '../moderation/moderation.service';
+import { PenaltyService } from '../penalty/penalty.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { DeliveryService } from '../delivery/delivery.service';
 import { geohashDistanceKm, distanceLabel } from '../../common/geo/geohash.util';
 import { scoreCandidate } from './ocean-score';
@@ -13,13 +15,17 @@ import { ReplyDto } from './dto/reply.dto';
 
 @Injectable()
 export class OceanService {
+  private readonly logger = new Logger(OceanService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly quota: QuotaService,
     private readonly moderation: ModerationService,
+    private readonly penalty: PenaltyService,
     private readonly delivery: DeliveryService,
     private readonly config: ConfigService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private async blockedUserIds(userId: string): Promise<string[]> {
@@ -100,6 +106,14 @@ export class OceanService {
         const fishing = await this.prisma.fishingRecord.create({
           data: { userId, letterId: c.id, lockUntil },
         });
+        // 去人格化弱通知：告知作者「有人拾起了你的一封信」，绝不透露打捞者身份
+        try {
+          await this.notifications.create(c.authorId, NotificationType.LETTER_FISHED, '有人在海面拾起了你的一封信', {
+            letterPublicId: c.publicId,
+          });
+        } catch (e) {
+          this.logger.error(`LETTER_FISHED 通知失败: ${e}`);
+        }
         return this.buildPreview(fishing.id, c, me?.geohash5, lockUntil);
       } catch {
         // 唯一约束等异常：回滚锁，试下一封
@@ -216,9 +230,10 @@ export class OceanService {
       throw new BadRequestException({ code: 'LETTER_NOT_OPEN', message: '这封信的状态已改变' });
     }
 
-    const result = this.moderation.review(dto.body);
-    await this.moderation.logReview(ReviewTargetType.CORRESPONDENCE, unseal.id, result);
+    const result = await this.moderation.review(dto.body);
+    const reviewId = await this.moderation.logReview(ReviewTargetType.CORRESPONDENCE, unseal.id, result);
     if (result.action !== ReviewAction.PASS) {
+      if (result.action === ReviewAction.BLOCK) await this.penalty.recordContentBlock(userId, reviewId);
       throw new BadRequestException({ code: 'CONTENT_BLOCKED', message: '回信里似乎有联系方式或不友善的内容，修改后再寄出' });
     }
 

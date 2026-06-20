@@ -85,3 +85,25 @@ export enum MatchPreference {
   SIMILAR = 0, // 寻一个懂我的人
   COMPLEMENT = 1, // 遇一个全然不同的世界
 }
+
+/**
+ * 系统通知类型（仅"抵达类"弱通知，遵循去人格化；详见 docs/API设计.md §4.3）。
+ * 成员集合须与 prisma/schema.prisma 的 NotificationType 一致（enum-drift.spec.ts 守护）。
+ */
+export enum NotificationType {
+  LETTER_DELIVERED = 'LETTER_DELIVERED', // 投递的信漂入海面
+  LETTER_FISHED = 'LETTER_FISHED', // 自己的信被人拾起（去人格化，不透露是谁）
+  PENPAL_REPLY_ARRIVED = 'PENPAL_REPLY_ARRIVED', // 笔友回信经在途后抵达
+  UNSEAL_REPLY_WINDOW_WARNING = 'UNSEAL_REPLY_WINDOW_WARNING', // 自己拆封的信回信窗口剩 ≤1 天
+  UNSEAL_EXPIRED_REDRIFT = 'UNSEAL_EXPIRED_REDRIFT', // 7 天未回信，信回池重漂
+}
+
+/**
+ * 申诉处理状态。
+ * 成员集合须与 prisma/schema.prisma 的 AppealStatus 一致（enum-drift.spec.ts 守护）。
+ */
+export enum AppealStatus {
+  OPEN = 'OPEN', // 已提交，待人工复核
+  UPHELD = 'UPHELD', // 维持原处罚（申诉驳回）
+  OVERTURNED = 'OVERTURNED', // 推翻原处罚（申诉成立）
+}

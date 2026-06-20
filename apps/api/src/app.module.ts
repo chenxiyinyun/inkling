@@ -10,6 +10,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { QuotaModule } from './modules/quota/quota.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
+import { PenaltyModule } from './modules/penalty/penalty.module';
 import { DeliveryModule } from './modules/delivery/delivery.module';
 import { LettersModule } from './modules/letters/letters.module';
 import { OceanModule } from './modules/ocean/ocean.module';
@@ -29,6 +30,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     PrismaModule,
     RedisModule,
     ModerationModule,
+    PenaltyModule,
     DeliveryModule,
     AuthModule,
     UsersModule,

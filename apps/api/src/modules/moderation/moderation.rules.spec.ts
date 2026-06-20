@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ReviewAction, RiskLevel } from '@prisma/client';
-import { reviewText } from './moderation.rules';
+import { reviewText, normalizeText } from './moderation.rules';
 
 describe('reviewText — 干净内容', () => {
   it('普通中文 → SAFE / PASS / 无命中', () => {
@@ -48,15 +48,45 @@ describe('reviewText — 不友善内容', () => {
   });
 });
 
-// 已知缺口快照（见 docs/代码审计与迭代计划.md §3）：锁定当前漏检基线，
-// Phase 3 接归一化/第三方 API 后这些用例应转为命中（届时本块会失败，提醒更新）。
-describe('reviewText — 已知缺口（当前漏检，待 Phase 3 修复）', () => {
-  it('[已知缺口] 全角数字手机号当前漏检', () => {
-    expect(reviewText('１３８００１３８０００').action).toBe(ReviewAction.PASS);
+// Phase 3 归一化预处理：原"已知缺口"现已转为命中（对抗手段被还原后拦截）。
+describe('reviewText — 归一化后命中对抗手段（Phase 3）', () => {
+  it('全角数字手机号 → BLOCK', () => {
+    expect(reviewText('１３８００１３８０００').action).toBe(ReviewAction.BLOCK);
   });
 
-  it('[已知缺口] 中文数字 / 空格拆分 / "a at b dot com" 当前漏检', () => {
-    expect(reviewText('一三八零零一三八').action).toBe(ReviewAction.PASS);
-    expect(reviewText('foo at bar dot com').action).toBe(ReviewAction.PASS);
+  it('中文数字号码 → BLOCK', () => {
+    expect(reviewText('一三八零零一三八零零零').action).toBe(ReviewAction.BLOCK);
+  });
+
+  it('空格 / 连字符拆分的号码 → BLOCK', () => {
+    expect(reviewText('打我 138 0013 8000').action).toBe(ReviewAction.BLOCK);
+    expect(reviewText('138-0013-8000').action).toBe(ReviewAction.BLOCK);
+  });
+
+  it('"a at b dot com" 邮箱规避 → BLOCK', () => {
+    expect(reviewText('foo at bar dot com').action).toBe(ReviewAction.BLOCK);
+  });
+
+  it('英文脏词（多语种桶）→ REVIEW', () => {
+    expect(reviewText('this is bullshit, you bitch').action).toBe(ReviewAction.REVIEW);
+  });
+
+  it('正常含"at"的英文句子不误伤（无 TLD 不构成邮箱）', () => {
+    expect(reviewText('I sat at home reading a good book').action).toBe(ReviewAction.PASS);
+  });
+});
+
+describe('normalizeText 归一化', () => {
+  it('全角字母数字标点 → 半角', () => {
+    expect(normalizeText('ＡＢＣ１２３＠．')).toBe('ABC123@.');
+  });
+  it('中文数字 → 阿拉伯', () => {
+    expect(normalizeText('一三八零')).toBe('1380');
+  });
+  it('" at "/" dot " 还原为 @ / .', () => {
+    expect(normalizeText('foo at bar dot com')).toBe('foo@bar.com');
+  });
+  it('不还原单词内部的 at（that/rate 等）', () => {
+    expect(normalizeText('that rate is great')).toBe('that rate is great');
   });
 });

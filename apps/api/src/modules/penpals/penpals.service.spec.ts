@@ -28,11 +28,12 @@ function makePenpals() {
   };
   const moderation = {
     review: vi.fn(() => ({ risk: 'SAFE', action: ReviewAction.PASS, hits: [] })),
-    logReview: vi.fn().mockResolvedValue(undefined),
+    logReview: vi.fn().mockResolvedValue('rev1'),
   };
+  const penalty = { recordContentBlock: vi.fn().mockResolvedValue(undefined) };
   const delivery = { correspondenceDelivery: vi.fn(() => ({ deliverAt: new Date(), vehicleLabel: '信鸽' })) };
-  const service = new PenpalsService(prisma, moderation as any, delivery as any);
-  return { service, prisma, moderation };
+  const service = new PenpalsService(prisma, moderation as any, penalty as any, delivery as any);
+  return { service, prisma, moderation, penalty };
 }
 
 const DTO = { body: '最近过得怎么样？' };

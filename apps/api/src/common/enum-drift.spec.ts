@@ -15,6 +15,8 @@ const MIRRORED = [
   'DeliveryVehicle',
   'RelationStatus',
   'ReportReason',
+  'NotificationType',
+  'AppealStatus',
 ] as const;
 
 describe('shared 枚举 ↔ Prisma 枚举 一致性', () => {

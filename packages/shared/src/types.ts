@@ -1,4 +1,4 @@
-import type { AgeTier, LetterStatus, RelationStatus } from './enums';
+import type { AgeTier, LetterStatus, NotificationType, RelationStatus } from './enums';
 import type { MbtiValue } from './mbti';
 
 /** 统一 API 响应结构 */
@@ -72,4 +72,26 @@ export interface QuotaToday {
   fish: number;
   unseal: number;
   resetsAt: string; // ISO
+}
+
+/**
+ * 系统通知条目（去人格化弱通知）。ref 仅含公开 id，绝不含对方身份。
+ * 字段与 docs/API设计.md §2.12 对齐（codebase 统一用 camelCase）。
+ */
+export interface NotificationItem {
+  publicId: string;
+  type: NotificationType;
+  title: string;
+  ref: Record<string, unknown>; // { letterPublicId } / { relationPublicId, previewExcerpt } / { unsealId, daysLeft } ...
+  createdAt: string; // ISO
+  createdBand: string; // 粗档时间文案（"刚刚 / 1天前"），维持"慢"世界观
+  read: boolean; // 仅本人对系统通知的已读态（红点），与"信件已读"无关
+}
+
+/** 通知列表（游标分页） */
+export interface NotificationPage {
+  items: NotificationItem[];
+  nextCursor: string | null;
+  hasMore: boolean;
+  limit: number;
 }

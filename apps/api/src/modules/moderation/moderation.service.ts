@@ -1,25 +1,32 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ReviewTargetType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { reviewText, ReviewResult } from './moderation.rules';
+import { ReviewResult } from './moderation.rules';
+import { MODERATION_PROVIDER, ModerationProvider } from './moderation.provider';
 
 export { ReviewResult } from './moderation.rules';
 
 /**
- * 内容审核服务。规则判定委托给纯函数 {@link reviewText}（见 moderation.rules.ts，便于单测），
- * 本服务只负责调度与落库。生产期可替换为可插拔的 ModerationProvider（见 docs/代码审计与迭代计划.md §3）。
+ * 内容审核服务。判定委托给可插拔的 {@link ModerationProvider}（env 切换 local/remote），
+ * 本服务只负责调度与落库审计。
  */
 @Injectable()
 export class ModerationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(MODERATION_PROVIDER) private readonly provider: ModerationProvider,
+  ) {}
 
-  review(text: string): ReviewResult {
-    return reviewText(text);
+  review(text: string): Promise<ReviewResult> {
+    return this.provider.review(text);
   }
 
-  async logReview(targetType: ReviewTargetType, targetId: string, result: ReviewResult) {
-    await this.prisma.contentReview.create({
+  /** 落审计表，并返回 ContentReview.id 供风控（自动 Penalty）关联 relatedReviewId。 */
+  async logReview(targetType: ReviewTargetType, targetId: string, result: ReviewResult): Promise<string> {
+    const row = await this.prisma.contentReview.create({
       data: { targetType, targetId, risk: result.risk, action: result.action, hits: result.hits },
+      select: { id: true },
     });
+    return row.id;
   }
 }

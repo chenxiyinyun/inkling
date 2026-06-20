@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { ConsentStatus, User } from '@prisma/client';
+import { ConsentStatus, User, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { deriveAgeDecision } from './age.util';
@@ -75,10 +75,23 @@ export class AuthService {
       where: { OR: [dto.email ? { email: dto.email } : undefined, dto.phone ? { phone: dto.phone } : undefined].filter(Boolean) as any },
     });
     if (!user) throw new UnauthorizedException({ code: 'INVALID_CREDENTIALS', message: '账号或密码不对' });
-    if (user.status === 'BANNED') throw new ForbiddenException({ code: 'BANNED', message: '账号已被封禁' });
+    if (user.status === UserStatus.BANNED) throw new ForbiddenException({ code: 'BANNED', message: '账号已被封禁' });
 
     const ok = await bcrypt.compare(dto.password, user.passwordHash);
     if (!ok) throw new UnauthorizedException({ code: 'INVALID_CREDENTIALS', message: '账号或密码不对' });
+
+    // 冻结拦截（凭证正确后再判定，避免向错误密码泄露账号状态）：
+    // 仍在冻结期 → 拒绝；冻结已到期 → 自动解冻后放行。
+    if (user.status === UserStatus.FROZEN) {
+      if (user.frozenUntil && user.frozenUntil > new Date()) {
+        throw new ForbiddenException({
+          code: 'ACCOUNT_FROZEN',
+          message: `账号因违规被临时冻结，将于 ${user.frozenUntil.toISOString()} 后恢复`,
+        });
+      }
+      await this.prisma.user.update({ where: { id: user.id }, data: { status: UserStatus.ACTIVE, frozenUntil: null } });
+      user.status = UserStatus.ACTIVE; // 同步本地对象供 issueTokens 用
+    }
 
     await this.prisma.user.update({ where: { id: user.id }, data: { lastActiveAt: new Date() } });
     return this.issueTokens(user);

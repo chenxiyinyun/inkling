@@ -3,7 +3,7 @@
  * 有状态：配额随操作递减、打捞→预览→拆封→回信→笔友 全链路可走通。
  * 持久化到 sessionStorage（按标签页），刷新不丢档；换标签页/关闭即清。
  */
-import { AgeTier, LetterStatus, RelationStatus, QUOTA_DEFAULTS } from '@inkling/shared';
+import { AgeTier, LetterStatus, NotificationType, RelationStatus, QUOTA_DEFAULTS } from '@inkling/shared';
 import type { MeProfile, MyLetter, PublicProfile } from '@inkling/shared';
 
 const STORAGE_KEY = 'inkling_mock_db_v1';
@@ -47,6 +47,15 @@ export interface Correspondence {
   createdAt: string;
 }
 
+export interface StoredNotification {
+  publicId: string;
+  type: NotificationType;
+  title: string;
+  ref: Record<string, unknown>;
+  createdAt: string;
+  read: boolean;
+}
+
 export interface MockState {
   seq: number;
   quotaDate: string;
@@ -57,6 +66,7 @@ export interface MockState {
   unseals: UnsealRec[];
   relations: Relation[];
   correspondences: Correspondence[];
+  notifications: StoredNotification[];
 }
 
 function todayUtc(): string {
@@ -124,6 +134,26 @@ function seed(): MockState {
     },
   ];
 
+  const nowMs = Date.now();
+  const notifications: StoredNotification[] = [
+    {
+      publicId: 'ntf-seed-1',
+      type: NotificationType.LETTER_FISHED,
+      title: '有人在海面拾起了你的一封信',
+      ref: {},
+      createdAt: new Date(nowMs - 4 * 60_000).toISOString(),
+      read: false,
+    },
+    {
+      publicId: 'ntf-seed-2',
+      type: NotificationType.LETTER_DELIVERED,
+      title: '你的信已漂入海面，静待有缘人拾起',
+      ref: {},
+      createdAt: new Date(nowMs - 2 * 86_400_000).toISOString(),
+      read: true,
+    },
+  ];
+
   return {
     seq: 1,
     quotaDate: todayUtc(),
@@ -134,6 +164,7 @@ function seed(): MockState {
     unseals: [],
     relations: [],
     correspondences: [],
+    notifications,
   };
 }
 
@@ -166,6 +197,7 @@ export function resetDb() {
 
 export function db(): MockState {
   ensureQuotaFresh();
+  if (!state.notifications) state.notifications = []; // 兼容旧标签页持久化状态
   return state;
 }
 

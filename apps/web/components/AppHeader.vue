@@ -2,8 +2,10 @@
 import { useQuotaStore } from '~/stores/quota';
 
 const quota = useQuotaStore();
+const { unread, startPolling } = useNotifications();
 onMounted(() => {
   if (!quota.loaded) quota.load().catch(() => {});
+  startPolling();
 });
 </script>
 
@@ -15,6 +17,13 @@ onMounted(() => {
         <span title="今日投递">🖋 {{ quota.send }}</span>
         <span title="今日打捞">🪝 {{ quota.fish }}</span>
         <span title="今日拆封">✉ {{ quota.unseal }}</span>
+        <NuxtLink to="/me/notifications" class="relative ml-1 text-base leading-none" title="通知" aria-label="通知">
+          🔔
+          <span
+            v-if="unread > 0"
+            class="absolute -top-2 -right-2 min-w-4 h-4 px-1 rounded-full bg-terra text-white text-[10px] leading-4 text-center font-600"
+          >{{ unread > 9 ? '9+' : unread }}</span>
+        </NuxtLink>
       </div>
     </div>
   </header>

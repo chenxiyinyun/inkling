@@ -36,6 +36,7 @@ const ageTierLabel: Record<string, string> = { ADULT: '成年', TEEN: '未成年
     </div>
 
     <div class="mt-5 space-y-2">
+      <NuxtLink to="/me/notifications" class="card block">通知中心 ›</NuxtLink>
       <NuxtLink to="/onboarding/profile" class="card block">编辑文字名片 ›</NuxtLink>
       <NuxtLink to="/me/settings" class="card block">设置（守护模式 · 闭关 · 隐私）›</NuxtLink>
     </div>

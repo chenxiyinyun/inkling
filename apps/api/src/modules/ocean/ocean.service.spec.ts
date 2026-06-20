@@ -33,11 +33,22 @@ function makeOcean() {
   };
   const moderation = {
     review: vi.fn(() => ({ risk: 'SAFE', action: ReviewAction.PASS, hits: [] })),
-    logReview: vi.fn().mockResolvedValue(undefined),
+    logReview: vi.fn().mockResolvedValue('rev1'),
   };
+  const penalty = { recordContentBlock: vi.fn().mockResolvedValue(undefined) };
   const delivery = { correspondenceDelivery: vi.fn(() => ({ deliverAt: new Date(), vehicleLabel: '信鸽' })) };
-  const service = new OceanService(prisma, {} as any, {} as any, moderation as any, delivery as any, { get: vi.fn() } as any);
-  return { service, prisma, tx, moderation };
+  const notifications = { create: vi.fn().mockResolvedValue(undefined) };
+  const service = new OceanService(
+    prisma,
+    {} as any,
+    {} as any,
+    moderation as any,
+    penalty as any,
+    delivery as any,
+    { get: vi.fn() } as any,
+    notifications as any,
+  );
+  return { service, prisma, tx, moderation, penalty, notifications };
 }
 
 const DTO = { body: '谢谢你的来信，我很喜欢。' };

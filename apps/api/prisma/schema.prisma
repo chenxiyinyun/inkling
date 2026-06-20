@@ -112,6 +112,21 @@ enum DeletionStatus {
   DONE
 }
 
+enum AppealStatus {
+  OPEN // 已提交，待人工复核
+  UPHELD // 维持原处罚
+  OVERTURNED // 推翻原处罚
+}
+
+// 仅"抵达类"弱通知（去人格化）。成员集合须与 packages/shared 的 NotificationType 一致。
+enum NotificationType {
+  LETTER_DELIVERED // 投递的信漂入海面
+  LETTER_FISHED // 自己的信被人拾起（不透露是谁）
+  PENPAL_REPLY_ARRIVED // 笔友回信经在途后抵达
+  UNSEAL_REPLY_WINDOW_WARNING // 自己拆封的信回信窗口剩 ≤1 天
+  UNSEAL_EXPIRED_REDRIFT // 7 天未回信，信回池重漂
+}
+
 // ───────────────── 用户与资料 ─────────────────
 
 model User {
@@ -142,6 +157,8 @@ model User {
   blocks          Block[]          @relation("Blocker")
   blockedBy       Block[]          @relation("Blocked")
   deletionReqs    DataDeletionRequest[]
+  appeals         Appeal[]
+  notifications   Notification[]
 
   @@map("users")
 }
@@ -244,6 +261,7 @@ model UnsealRecord {
   replyDeadline DateTime // 自送达起算 7 天
   replied       Boolean   @default(false)
   recycledAt    DateTime? // 回信窗口过期被 scheduler 回收/归档的时刻（null=仍在窗口内或已回信）
+  warnedAt      DateTime? // 已发"回信窗口将关闭"预警的时刻（幂等去重，防 20s 轮询重复通知）
 
   @@index([letterId])
   @@index([replyDeadline])
@@ -336,6 +354,7 @@ model ContentReview {
 
 model Penalty {
   id              String      @id @default(cuid())
+  publicId        String      @unique @default(cuid())
   userId          String
   user            User        @relation(fields: [userId], references: [id])
   type            PenaltyType
@@ -386,4 +405,36 @@ model DataDeletionRequest {
   processedAt DateTime?
 
   @@map("data_deletion_requests")
+}
+
+model Appeal {
+  id         String       @id @default(cuid())
+  publicId   String       @unique @default(cuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetType String? // penalty / rejected / age_gate 等申诉对象类别
+  targetId   String? // 被申诉对象的公开 id（如 penalty.publicId）
+  reason     String
+  status     AppealStatus @default(OPEN)
+  createdAt  DateTime     @default(now())
+  resolvedAt DateTime?
+
+  @@index([userId])
+  @@map("appeals")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  publicId  String           @unique @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  ref       Json             @default("{}") // 仅公开 id（去人格化）：{ letterPublicId } / { relationPublicId, previewExcerpt } ...
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+  @@map("notifications")
 }

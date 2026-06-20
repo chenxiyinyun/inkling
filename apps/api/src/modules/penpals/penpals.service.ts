@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { RelationStatus, ReviewAction, ReviewTargetType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
+import { PenaltyService } from '../penalty/penalty.service';
 import { DeliveryService } from '../delivery/delivery.service';
 import { geohashDistanceKm } from '../../common/geo/geohash.util';
 import { SendCorrespondenceDto } from './dto/send-correspondence.dto';
@@ -11,6 +12,7 @@ export class PenpalsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly moderation: ModerationService,
+    private readonly penalty: PenaltyService,
     private readonly delivery: DeliveryService,
   ) {}
 
@@ -115,9 +117,10 @@ export class PenpalsService {
       throw new ForbiddenException({ code: 'RELATION_BLOCKED', message: '你与对方之间已无法通信' });
     }
 
-    const result = this.moderation.review(dto.body);
-    await this.moderation.logReview(ReviewTargetType.CORRESPONDENCE, rel.id, result);
+    const result = await this.moderation.review(dto.body);
+    const reviewId = await this.moderation.logReview(ReviewTargetType.CORRESPONDENCE, rel.id, result);
     if (result.action !== ReviewAction.PASS) {
+      if (result.action === ReviewAction.BLOCK) await this.penalty.recordContentBlock(userId, reviewId);
       throw new BadRequestException({ code: 'CONTENT_BLOCKED', message: '信里似乎有联系方式或不友善的内容，修改后再寄出' });
     }
 

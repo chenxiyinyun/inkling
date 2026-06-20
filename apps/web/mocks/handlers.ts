@@ -2,9 +2,9 @@
  * 假后端路由表（见 db.ts）。每条 handler 返回的就是 useApi 解包后的 data；
  * 失败抛 MockError，由 dispatch 包成 ofetch 风格错误（带 response.status 与 data.error）。
  */
-import { LetterStatus, RelationStatus } from '@inkling/shared';
-import type { LetterPreview, MeProfile, MyLetter, PenPalSummary, PublicProfile, QuotaToday } from '@inkling/shared';
-import { db, save, nextId, resetsAtUtc, findProfile, type PoolLetter } from './db';
+import { LetterStatus, RelationStatus, timeBand } from '@inkling/shared';
+import type { LetterPreview, MeProfile, MyLetter, NotificationItem, PenPalSummary, PublicProfile, QuotaToday } from '@inkling/shared';
+import { db, save, nextId, resetsAtUtc, findProfile, type PoolLetter, type StoredNotification } from './db';
 
 export class MockError extends Error {
   constructor(public status: number, public code: string, message: string) {
@@ -41,6 +41,18 @@ function previewOf(letter: PoolLetter): LetterPreview {
     theme: letter.theme,
     distanceLabel: letter.distanceLabel,
     vehicleLabel: letter.vehicleLabel,
+  };
+}
+
+function notificationItemOf(n: StoredNotification): NotificationItem {
+  return {
+    publicId: n.publicId,
+    type: n.type,
+    title: n.title,
+    ref: n.ref,
+    createdAt: n.createdAt,
+    createdBand: timeBand(n.createdAt),
+    read: n.read,
   };
 }
 
@@ -280,6 +292,40 @@ const routes: Route[] = [
       const rel = s.relations.find((r) => r.relationId === params.id);
       if (!rel) throw new MockError(404, 'RELATION_NOT_FOUND', '找不到这段信缘');
       return summaryOf(rel);
+    },
+  },
+
+  // ---- 通知 ----
+  {
+    method: 'GET',
+    pattern: /^\/notifications\/unread-count$/,
+    run: () => ({ unread: db().notifications.filter((n) => !n.read).length }),
+  },
+  {
+    method: 'GET',
+    pattern: /^\/notifications$/,
+    run: () => {
+      const items = [...db().notifications]
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map(notificationItemOf);
+      return { items, nextCursor: null, hasMore: false, limit: items.length };
+    },
+  },
+  {
+    method: 'POST',
+    pattern: /^\/notifications\/read$/,
+    run: ({ body }) => {
+      const s = db();
+      let updated = 0;
+      for (const n of s.notifications) {
+        if (n.read) continue;
+        if (body?.all === true || (Array.isArray(body?.ids) && body.ids.includes(n.publicId))) {
+          n.read = true;
+          updated += 1;
+        }
+      }
+      save();
+      return { updated };
     },
   },
 ];

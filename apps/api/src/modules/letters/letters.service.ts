@@ -3,6 +3,7 @@ import { LetterStatus, ReviewAction, ReviewTargetType } from '@prisma/client';
 import { MBTI_LABELS_ZH } from '@inkling/shared';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
+import { PenaltyService } from '../penalty/penalty.service';
 import { QuotaService } from '../quota/quota.service';
 import { DeliveryService } from '../delivery/delivery.service';
 import { CreateLetterDto } from './dto/create-letter.dto';
@@ -27,6 +28,7 @@ export class LettersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly moderation: ModerationService,
+    private readonly penalty: PenaltyService,
     private readonly quota: QuotaService,
     private readonly delivery: DeliveryService,
   ) {}
@@ -50,9 +52,11 @@ export class LettersService {
 
     // 1) 审核（高危秒级先行拦截；BLOCK 与 REVIEW 都不放行——MVP 无人工复核队列，
     //    脏词/不友善内容一律退回修改，杜绝静默通过。详见 docs/代码审计与迭代计划.md §1）
-    const result = this.moderation.review(letter.body);
-    await this.moderation.logReview(ReviewTargetType.LETTER, letter.id, result);
+    const result = await this.moderation.review(letter.body);
+    const reviewId = await this.moderation.logReview(ReviewTargetType.LETTER, letter.id, result);
     if (result.action !== ReviewAction.PASS) {
+      // BLOCK（高危）记一条处罚并按累计自动升级冻结；REVIEW（中危）仅退回不记罚
+      if (result.action === ReviewAction.BLOCK) await this.penalty.recordContentBlock(userId, reviewId);
       throw new BadRequestException({
         code: 'CONTENT_BLOCKED',
         message: '这封信里似乎有联系方式或不友善的内容，修改后可以重新寄出',

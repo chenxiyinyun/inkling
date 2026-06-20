@@ -1,15 +1,28 @@
-import { Controller, Get } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
+import { NotificationsService } from './notifications.service';
+import { MarkReadDto } from './dto/mark-read.dto';
 
 /**
- * 通知（MVP 占位）。
- * 设计：强通知仅用于"笔友回信抵达""回信窗口剩 <24h"；弱通知用应用内角标。
- * 生产期：WebSocket 实时事件 + Web Push / 服务号补充通道（详见 docs/产品设计文档.md §1.8）。
+ * 通知中心（MVP 前端轮询）。
+ * 弱通知去人格化（"有人拾起了你的一封信"，不透露是谁）；生产期叠加 WebSocket/Web Push。
  */
 @Controller('notifications')
 export class NotificationsController {
+  constructor(private readonly notifications: NotificationsService) {}
+
   @Get()
-  list(@CurrentUser() _user: AuthUser) {
-    return [];
+  list(@CurrentUser() user: AuthUser, @Query('cursor') cursor?: string, @Query('limit') limit?: string) {
+    return this.notifications.list(user.userId, cursor, limit ? Number(limit) : undefined);
+  }
+
+  @Get('unread-count')
+  async unread(@CurrentUser() user: AuthUser) {
+    return { unread: await this.notifications.unreadCount(user.userId) };
+  }
+
+  @Post('read')
+  markRead(@CurrentUser() user: AuthUser, @Body() dto: MarkReadDto) {
+    return this.notifications.markRead(user.userId, dto.ids, dto.all);
   }
 }

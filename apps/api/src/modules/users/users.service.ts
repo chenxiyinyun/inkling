@@ -85,18 +85,84 @@ export class UsersService {
     return this.getMe(userId);
   }
 
-  /** GDPR 数据可携：导出（MVP 精简）。 */
+  /** GDPR 数据可携：全量结构化 JSON 导出（含信件正文、笔友往来、举报与处罚）。 */
   async exportData(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, include: { profile: true } });
-    const [letters, relations] = await Promise.all([
-      this.prisma.letter.count({ where: { authorId: userId } }),
-      this.prisma.penPalRelation.count({ where: { OR: [{ userAId: userId }, { userBId: userId }] } }),
-    ]);
+    const [user, letters, relations, unseals, fishings, reportsMade, penalties, blocks, appeals, deletionReqs] =
+      await Promise.all([
+        this.prisma.user.findUnique({ where: { id: userId }, include: { profile: true, parentalConsent: true } }),
+        this.prisma.letter.findMany({ where: { authorId: userId }, orderBy: { createdAt: 'asc' } }),
+        this.prisma.penPalRelation.findMany({
+          where: { OR: [{ userAId: userId }, { userBId: userId }] },
+          include: { correspondences: { orderBy: { createdAt: 'asc' } } },
+        }),
+        this.prisma.unsealRecord.findMany({ where: { userId } }),
+        this.prisma.fishingRecord.findMany({ where: { userId } }),
+        this.prisma.report.findMany({ where: { reporterId: userId }, orderBy: { createdAt: 'asc' } }),
+        this.prisma.penalty.findMany({ where: { userId }, orderBy: { startsAt: 'asc' } }),
+        this.prisma.block.findMany({ where: { userId }, include: { target: { select: { publicId: true } } } }),
+        this.prisma.appeal.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
+        this.prisma.dataDeletionRequest.findMany({ where: { userId } }),
+      ]);
+
     return {
-      account: { publicId: user?.publicId, email: user?.email, phone: user?.phone, createdAt: user?.createdAt },
+      exportedAt: new Date().toISOString(),
+      account: {
+        publicId: user?.publicId,
+        email: user?.email,
+        phone: user?.phone,
+        status: user?.status,
+        ageTier: user?.ageTier,
+        createdAt: user?.createdAt?.toISOString(),
+      },
       profile: user?.profile,
-      stats: { letters, relations },
-      note: '完整导出（含全部信件内容）在生产期提供异步打包下载。',
+      parentalConsent: user?.parentalConsent ?? null,
+      letters: letters.map((l) => ({
+        publicId: l.publicId,
+        body: l.body,
+        theme: l.theme,
+        status: l.status,
+        createdAt: l.createdAt.toISOString(),
+      })),
+      penpals: relations.map((rel) => ({
+        relationId: rel.publicId,
+        status: rel.status,
+        exchangeCount: rel.exchangeCount,
+        createdAt: rel.createdAt.toISOString(),
+        correspondences: rel.correspondences.map((c) => {
+          const mine = c.senderId === userId;
+          const delivered = !!c.deliveredAt;
+          // 对方仍在途的信尚不可见，导出时也不泄露正文（与站内可见性一致）
+          return mine || delivered
+            ? { mine, body: c.body, createdAt: c.createdAt.toISOString(), deliveredAt: c.deliveredAt?.toISOString() }
+            : { mine, inTransit: true };
+        }),
+      })),
+      unseals: unseals.map((u) => ({
+        letterId: u.letterId,
+        replyDeadline: u.replyDeadline.toISOString(),
+        replied: u.replied,
+        recycledAt: u.recycledAt?.toISOString() ?? null,
+      })),
+      fishings: fishings.map((f) => ({ letterId: f.letterId, fishedAt: f.fishedAt.toISOString(), released: f.released })),
+      reportsMade: reportsMade.map((r) => ({ reason: r.reason, detail: r.detail, status: r.status, createdAt: r.createdAt.toISOString() })),
+      penalties: penalties.map((p) => ({
+        publicId: p.publicId,
+        type: p.type,
+        reason: p.reason,
+        startsAt: p.startsAt.toISOString(),
+        endsAt: p.endsAt?.toISOString() ?? null,
+      })),
+      appeals: appeals.map((a) => ({
+        publicId: a.publicId,
+        targetType: a.targetType,
+        targetId: a.targetId,
+        reason: a.reason,
+        status: a.status,
+        createdAt: a.createdAt.toISOString(),
+      })),
+      blocks: blocks.map((b) => ({ targetPublicId: b.target.publicId, createdAt: b.createdAt.toISOString() })),
+      deletionRequests: deletionReqs.map((d) => ({ status: d.status, requestedAt: d.requestedAt.toISOString() })),
+      note: '本导出为完整结构化 JSON；异步打包成文件下载（对象存储）留待 C 档。',
     };
   }
 

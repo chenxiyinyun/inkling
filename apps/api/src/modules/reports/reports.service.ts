@@ -1,10 +1,15 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { PenaltyService } from '../penalty/penalty.service';
 import { CreateReportDto } from './dto/create-report.dto';
+import { CreateAppealDto } from './dto/create-appeal.dto';
 
 @Injectable()
 export class ReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly penalty: PenaltyService,
+  ) {}
 
   private async resolveUserId(publicId: string): Promise<string> {
     const u = await this.prisma.user.findUnique({ where: { publicId }, select: { id: true } });
@@ -17,6 +22,8 @@ export class ReportsService {
     await this.prisma.report.create({
       data: { reporterId, targetUserId, reason: dto.reason, detail: dto.detail },
     });
+    // 举报累积达阈值 → 自动冻结被举报者待人工复核
+    await this.penalty.recordReportAccumulation(targetUserId);
     return { reported: true, message: '已收到你的投诉，邮局会认真核查。' };
   }
 
@@ -45,13 +52,23 @@ export class ReportsService {
     return blocks.map((b) => ({ publicId: b.target.publicId, penName: b.target.profile?.penName ?? '某人', createdAt: b.createdAt.toISOString() }));
   }
 
-  async appeal(userId: string, detail: string) {
-    // MVP 占位：申诉进入人工复核队列（生产期落表 + SLA + 独立复核岗）
-    return { received: true, message: '申诉已提交，我们会人工复核。' };
+  async appeal(userId: string, dto: CreateAppealDto) {
+    // 落表进入人工复核队列（生产期叠加 SLA + 独立复核岗）
+    const appeal = await this.prisma.appeal.create({
+      data: { userId, targetType: dto.targetType ?? null, targetId: dto.targetId ?? null, reason: dto.reason },
+      select: { publicId: true, status: true },
+    });
+    return { appealId: appeal.publicId, status: appeal.status, message: '申诉已提交，我们会人工复核。' };
   }
 
   async myPenalties(userId: string) {
     const list = await this.prisma.penalty.findMany({ where: { userId }, orderBy: { startsAt: 'desc' } });
-    return list.map((p) => ({ type: p.type, reason: p.reason, startsAt: p.startsAt.toISOString(), endsAt: p.endsAt?.toISOString() }));
+    return list.map((p) => ({
+      publicId: p.publicId,
+      type: p.type,
+      reason: p.reason,
+      startsAt: p.startsAt.toISOString(),
+      endsAt: p.endsAt?.toISOString(),
+    }));
   }
 }

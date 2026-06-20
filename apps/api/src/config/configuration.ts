@@ -9,10 +9,15 @@ export interface AppConfig {
   letterMaxRecycle: number;
   minAgeHardFloor: number;
   guardianModeBelowAge: number;
-  /** 投递后入池前的固定延时（秒）。MVP 用短延时演示"信鸽起飞→漂入海面"。 */
+  /** 内容审核 Provider：local（默认本地规则）/ remote（第三方 API，C 档）。 */
+  moderation: { provider: string; remoteApiUrl?: string; remoteApiKey?: string };
+  /** 投递后入池前的固定延时（秒）。信件入海无收件人、距离未知，故用短延时演示"漂入海面"。 */
   letterPoolDelaySeconds: number;
-  /** 笔友往来在途延时（秒）。MVP 简化；生产期按距离精算。 */
-  correspondenceDeliverSeconds: number;
+  /**
+   * 笔友往来在途时长的缩放因子。在途毫秒 = pickDeliveryTier(距离).baseHours × 3600s × scale。
+   * prod=1（真实 4–96h）；本地/测试设 0 即时（CI/集成测试用 0）。
+   */
+  deliveryHoursScale: number;
 }
 
 const num = (v: string | undefined, d: number) => (v ? Number(v) : d);
@@ -36,6 +41,11 @@ export default (): AppConfig => ({
   letterMaxRecycle: num(process.env.LETTER_MAX_RECYCLE, 3),
   minAgeHardFloor: num(process.env.MIN_AGE_HARD_FLOOR, 13),
   guardianModeBelowAge: num(process.env.GUARDIAN_MODE_BELOW_AGE, 18),
+  moderation: {
+    provider: process.env.MODERATION_PROVIDER ?? 'local',
+    remoteApiUrl: process.env.MODERATION_API_URL,
+    remoteApiKey: process.env.MODERATION_API_KEY,
+  },
   letterPoolDelaySeconds: num(process.env.LETTER_POOL_DELAY_SECONDS, 30),
-  correspondenceDeliverSeconds: num(process.env.CORRESPONDENCE_DELIVER_SECONDS, 60),
+  deliveryHoursScale: num(process.env.DELIVERY_HOURS_SCALE, 1),
 });
