@@ -1,0 +1,68 @@
+# 信逢 Inkling · 生产编排（单机 2C4G 起步）
+# 务必在「仓库根目录」执行，让 --env-file 与 env_file 指向同一份 .env：
+#   docker compose -f deploy/docker-compose.prod.yml --env-file .env up -d --build
+# 首次种子（一次性）：见 docs/部署与运维.md「首次部署」。
+name: inkling
+
+services:
+  caddy:
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    image: inkling-web:latest
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?在 .env 设置正式域名或 :80}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/api.Dockerfile
+    image: inkling-api:latest
+    restart: unless-stopped
+    env_file:
+      - ../.env # 相对本 compose 文件 = 仓库根目录 .env（注入 DATABASE_URL/REDIS_URL/JWT_SECRET 等）
+    environment:
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    # 不对外暴露端口；仅 Caddy 经内部网络访问 api:3001
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-inkling}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?在 .env 设置强随机密码}
+      POSTGRES_DB: ${POSTGRES_DB:-inkling}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-inkling}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis-data:/data
+
+volumes:
+  pg-data:
+  redis-data:
+  caddy-data:
+  caddy-config:

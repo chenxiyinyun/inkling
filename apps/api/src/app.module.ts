@@ -17,6 +17,7 @@ import { OceanModule } from './modules/ocean/ocean.module';
 import { PenpalsModule } from './modules/penpals/penpals.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     PenpalsModule,
     ReportsModule,
     NotificationsModule,
+    HealthModule,
   ],
   providers: [
     // 全局 JWT 守卫（用 @Public() 放行公开端点）

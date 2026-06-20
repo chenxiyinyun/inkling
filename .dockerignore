@@ -1,0 +1,24 @@
+# 镜像构建上下文排除项（关键：排除宿主 node_modules，避免把 win32 二进制带进 linux 镜像）
+node_modules
+**/node_modules
+.git
+.github
+**/dist
+**/.output
+**/.nuxt
+**/.nitro
+**/.cache
+*.tsbuildinfo
+
+# 密钥：绝不进镜像层
+.env
+.env.*
+
+# 杂项
+coverage
+**/*.log
+.DS_Store
+Thumbs.db
+.idea
+.vscode
+docs

@@ -68,13 +68,22 @@ pnpm dev:web
 打开 http://localhost:3000 —— 注册 → 完善名片 → 去漂流海打捞种子信 → 拆封 → 回信结缘。
 
 > 演示提示：`.env` 里 `LETTER_POOL_DELAY_SECONDS`（默认 30s）控制"投递→漂入海面"的等待；
-> `CORRESPONDENCE_DELIVER_SECONDS`（默认 60s）控制笔友往来的"在途"时长。生产期按真实距离精算。
+> `DELIVERY_HOURS_SCALE`（生产 1=真实 4–96h 距离精算；本地可设小数加速，集成测试设 0 即时）控制笔友往来的"在途"时长。
 
 ## 测试
 
 ```bash
-pnpm test                    # Vitest：纯逻辑 + service 回归（无需 DB，70+ 用例）
+pnpm test                    # Vitest：纯逻辑 + service 回归（无需 DB，105 用例）
 pnpm typecheck               # 全包类型检查
+```
+
+## 部署上线（生产）
+
+照做型 runbook 见 **[docs/部署与运维.md](docs/部署与运维.md)**：单机四容器（Caddy 边缘自动 HTTPS + 同源反代 → NestJS → PostgreSQL/Redis），含环境密钥清单、首次部署、备份恢复、**上线检查清单**与**回滚预案**。配套产物在 [`deploy/`](deploy/)；`git push` 触发 CI 的 **Images** 工作流离线验证镜像可构建。
+
+```bash
+cp deploy/env.production.example .env   # 填密钥（见手册 §2）
+docker compose -f deploy/docker-compose.prod.yml --env-file .env up -d --build
 ```
 
 ## 目录结构

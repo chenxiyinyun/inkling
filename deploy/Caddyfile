@@ -1,0 +1,16 @@
+# 信逢 Inkling · 边缘反向代理 + 静态托管
+# SITE_ADDRESS 由环境变量注入：
+#   - 正式域名（如 inkling.example.com）→ Caddy 自动签发并续期 HTTPS 证书
+#   - 本机 / 无域名联测 → 设为 :80（明文，仅用于验证编排）
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# 后端 API：/v1/* 反代到 api 容器（保留 /v1 前缀，与 Nest 全局前缀一致）
+	@api path /v1/*
+	reverse_proxy @api api:3001
+
+	# 前端 SPA：静态资源 + history 模式回退到 index.html
+	root * /srv
+	try_files {path} /index.html
+	file_server
+}
