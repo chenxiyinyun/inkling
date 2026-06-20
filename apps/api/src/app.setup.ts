@@ -12,4 +12,7 @@ export function configureApp(app: INestApplication): void {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalInterceptors(new TransformInterceptor());
   app.useGlobalFilters(new AllExceptionsFilter());
+  // 反代后取真实客户端 IP（Caddy 设 X-Forwarded-For），限流方能按真实 IP 计数。
+  // trust proxy = 1：仅信任最靠前的一跳（Caddy），不信任更外层伪造的 XFF。
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
 }

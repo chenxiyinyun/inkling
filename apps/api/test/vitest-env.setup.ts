@@ -12,6 +12,8 @@ process.env.REDIS_URL ??= 'redis://localhost:6379';
 process.env.JWT_SECRET ??= 'test-secret-please-change';
 process.env.LETTER_POOL_DELAY_SECONDS ??= '0';
 process.env.DELIVERY_HOURS_SCALE ??= '0'; // 笔友往来在途即时（baseHours × 0），测试不等待
+process.env.THROTTLE_DISABLED ??= '1'; // 集成测试从单一 localhost IP 高频打接口，默认关限流免误伤
+// （throttle.e2e.spec.ts 会在自身 beforeAll 临时置 '0' 开启限流以验证机制，afterAll 复原）
 
 // 安全闸：集成测试会 TRUNCATE 所有表，绝不能误连到开发/生产库。
 // 要求库名包含 "test"（默认 inkling_test 已满足）。

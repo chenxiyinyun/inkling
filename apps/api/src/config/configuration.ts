@@ -18,6 +18,12 @@ export interface AppConfig {
    * prod=1（真实 4–96h）；本地/测试设 0 即时（CI/集成测试用 0）。
    */
   deliveryHoursScale: number;
+  /**
+   * 限流（防爆破 / 粗粒度 DoS 兜底）。窗口 ttlMs 内每 IP 每路由 limit 次。
+   * 业务滥用以「每日配额」为权威，此处只挡高频暴力；auth 端点另设更严上限（见 AuthController）。
+   * disabled=true 时整体跳过（集成测试用，避免单 IP 高频误伤）。
+   */
+  throttle: { ttlMs: number; limit: number; disabled: boolean };
 }
 
 const num = (v: string | undefined, d: number) => (v ? Number(v) : d);
@@ -48,4 +54,9 @@ export default (): AppConfig => ({
   },
   letterPoolDelaySeconds: num(process.env.LETTER_POOL_DELAY_SECONDS, 30),
   deliveryHoursScale: num(process.env.DELIVERY_HOURS_SCALE, 1),
+  throttle: {
+    ttlMs: num(process.env.THROTTLE_TTL_MS, 60_000),
+    limit: num(process.env.THROTTLE_LIMIT, 300),
+    disabled: process.env.THROTTLE_DISABLED === '1',
+  },
 });
