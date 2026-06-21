@@ -14,8 +14,46 @@ export default defineNuxtConfig({
   modules: [
     '@pinia/nuxt',
     '@unocss/nuxt',
-    // '@vite-pwa/nuxt', // TODO: 配齐图标后启用 PWA
+    '@vite-pwa/nuxt',
   ],
+
+  // PWA：可安装 + 离线壳（precache 构建产物 + 导航回退到 SPA 首页）。
+  // SW 仅在生产构建注入；API(/v1) 走网络、不缓存。新版本 autoUpdate 自动激活。
+  pwa: {
+    // 'prompt'：新版本不强制刷新在用页面（避免写信途中被打断丢草稿），
+    // 由 PwaUpdatePrompt 横幅让用户自行点「刷新启用」。
+    registerType: 'prompt',
+    manifest: {
+      name: '信逢 Inkling · 漂流邮局',
+      short_name: '信逢',
+      description: '让社交回归真诚与纯粹。慢，所以可贵。',
+      lang: 'zh-Hans',
+      dir: 'ltr',
+      theme_color: '#FAF6EE',
+      background_color: '#FAF6EE',
+      display: 'standalone',
+      orientation: 'portrait',
+      start_url: '/',
+      scope: '/',
+      icons: [
+        { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+        // PNG 兜底：部分浏览器/平台对 SVG maskable 支持不一
+        { src: '/pwa-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: '/pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        { src: '/pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      ],
+    },
+    workbox: {
+      globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+      navigateFallback: '/',
+      // API 与 SW 自身不应被 SPA 壳回退拦截
+      navigateFallbackDenylist: [/^\/v1\//, /^\/sw\.js$/, /^\/workbox-/],
+      cleanupOutdatedCaches: true,
+      // 不设 skipWaiting/clientsClaim：新 SW 等待，由用户经 PwaUpdatePrompt 确认后再激活
+    },
+    // 开发态默认不启用 SW（避免干扰 HMR / 前端 Mock）；生产构建自动注入。
+    devOptions: { enabled: false },
+  },
 
   css: ['@unocss/reset/tailwind.css', '~/assets/css/main.css'],
 
@@ -34,6 +72,17 @@ export default defineNuxtConfig({
         { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
         { name: 'description', content: '让社交回归真诚与纯粹。慢，所以可贵。' },
         { name: 'theme-color', content: '#FAF6EE' },
+        { name: 'apple-mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
+        { name: 'apple-mobile-web-app-title', content: '信逢' },
+      ],
+      link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+        // iOS Safari 不支持 SVG 的 apple-touch-icon，必须用 PNG，否则主屏回退为页面截图
+        { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
+        // @vite-pwa/nuxt(ssr:false) 只注册 SW、不注入 manifest 链接，故在此静态声明，
+        // 否则 Chrome/Android 探测不到 manifest 无法安装。
+        { rel: 'manifest', href: '/manifest.webmanifest' },
       ],
     },
   },

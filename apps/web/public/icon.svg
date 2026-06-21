@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="信逢 Inkling">
+  <!-- 漂流邮局：信封 + 火漆封缄 + 海浪。maskable 安全：内容居中、背景满铺。 -->
+  <rect width="512" height="512" fill="#FAF6EE"/>
+  <!-- 海面（底部弧浪） -->
+  <path d="M0 392 q64 -28 128 0 t128 0 t128 0 t128 0 V512 H0 Z" fill="#cfe0df"/>
+  <path d="M0 420 q64 -24 128 0 t128 0 t128 0 t128 0 V512 H0 Z" fill="#a9c7c6"/>
+  <!-- 信封 -->
+  <g transform="translate(106 150)">
+    <rect x="0" y="0" width="300" height="212" rx="18" fill="#F3E8D2" stroke="#5B4B3A" stroke-width="9"/>
+    <!-- 封盖 -->
+    <path d="M6 14 L150 128 L294 14" fill="none" stroke="#5B4B3A" stroke-width="9" stroke-linejoin="round"/>
+    <!-- 火漆封缄 -->
+    <circle cx="150" cy="120" r="34" fill="#C2703D" stroke="#9c592e" stroke-width="6"/>
+    <path d="M150 102 l5.6 11.4 12.6 1.8 -9.1 8.9 2.1 12.5 -11.2 -5.9 -11.2 5.9 2.1 -12.5 -9.1 -8.9 12.6 -1.8 Z" fill="#FAF6EE"/>
+  </g>
+</svg>

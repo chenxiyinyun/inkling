@@ -21,6 +21,7 @@
   "devDependencies": {
     "@pinia/nuxt": "^0.5.5",
     "@unocss/nuxt": "^0.63.4",
+    "@vite-pwa/nuxt": "^0.10.8",
     "nuxt": "3.13.2",
     "typescript": "^5.6.3",
     "unocss": "^0.63.4",

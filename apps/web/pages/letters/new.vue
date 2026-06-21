@@ -10,7 +10,43 @@ const theme = ref(THEMES[0]);
 const sending = ref(false);
 const error = ref('');
 
-onMounted(() => quota.load().catch(() => {}));
+// 草稿本地持久化：写信途中遇刷新/崩溃/SW 更新都不丢稿。
+const DRAFT_KEY = 'inkling_letter_draft';
+
+function onBeforeUnload(e: BeforeUnloadEvent) {
+  if (body.value.trim() && !sending.value) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+}
+
+onMounted(() => {
+  quota.load().catch(() => {});
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      if (typeof d?.body === 'string' && d.body.trim()) body.value = d.body;
+      if (typeof d?.theme === 'string' && THEMES.includes(d.theme)) theme.value = d.theme;
+    }
+  } catch { /* 忽略损坏草稿 */ }
+  window.addEventListener('beforeunload', onBeforeUnload);
+});
+onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload));
+
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
+watch([body, theme], () => {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      if (body.value.trim()) {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ body: body.value, theme: theme.value, ts: Date.now() }));
+      } else {
+        localStorage.removeItem(DRAFT_KEY);
+      }
+    } catch { /* 存储不可用时静默降级 */ }
+  }, 400);
+});
 
 async function send() {
   if (body.value.trim().length < 50) {
@@ -21,6 +57,7 @@ async function send() {
   error.value = '';
   try {
     await api.post('/letters/compose', { body: body.value, theme: theme.value });
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* noop */ }
     await quota.load();
     await navigateTo('/letters');
   } catch (e: any) {

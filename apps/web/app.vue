@@ -3,4 +3,5 @@
     <NuxtPage />
   </NuxtLayout>
   <ToastHost />
+  <PwaUpdatePrompt />
 </template>
