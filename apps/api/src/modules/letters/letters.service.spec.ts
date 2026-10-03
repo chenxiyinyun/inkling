@@ -3,7 +3,7 @@ import { LetterStatus, ReviewAction } from '@prisma/client';
 import { LettersService } from './letters.service';
 
 /**
- * submit() 回归测试（见 docs/代码审计与迭代计划.md §1）：
+ * submit() 回归测试（见 docs/设计文档.md）：
  *  - P0 中危 REVIEW 内容必须被拦截，且拦截发生在扣投递配额之前。
  */
 function makeLetters() {

@@ -28,7 +28,7 @@ onMounted(async () => {
 });
 
 async function send() {
-  if (!body.value.trim()) return;
+  if (!body.value.trim() || sending.value) return;
   sending.value = true;
   try {
     await api.post(`/penpals/${id}/letters`, { body: body.value });

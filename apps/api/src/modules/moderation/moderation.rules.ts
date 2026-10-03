@@ -9,7 +9,7 @@ export interface ReviewResult {
 /**
  * MVP 本地规则审核（纯函数，无任何依赖，便于单测）。
  * ⚠️ 这是基线：生产期需接第三方多语种内容安全 API + 大模型语义 + 人工复核
- *    （见 RemoteApiProvider / docs/安全与未成年人保护.md）。高危类必须机器秒级先行拦截。
+ *    （见 RemoteApiProvider / docs/设计文档.md）。高危类必须机器秒级先行拦截。
  * Phase 3 已补：归一化预处理（全角/中文数字/空格拆分/"a at b dot com"）+ 多语种词库分桶。
  */
 

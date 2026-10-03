@@ -24,7 +24,7 @@ export class LocalRulesProvider implements ModerationProvider {
  * fail-safe 原则——绝不因为远程不可用而静默放行高危内容：
  *  - 未配置 endpoint/key：降级到本地规则（标记 unconfigured）。
  *  - 已配置但调用失败：fail-closed，沿用本地规则结果（标记 fallback），绝不返回 PASS 兜底。
- * 真正接入第三方 API 的 fetch/解析留待 C 档（见 docs/安全与未成年人保护.md）。
+ * 真正接入第三方 API 的 fetch/解析留待 C 档（见 docs/设计文档.md）。
  */
 export class RemoteApiProvider implements ModerationProvider {
   constructor(

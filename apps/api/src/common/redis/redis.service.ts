@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
 
 /**
@@ -7,6 +7,7 @@ import Redis from 'ioredis';
  */
 @Injectable()
 export class RedisService implements OnModuleDestroy {
+  private readonly logger = new Logger(RedisService.name);
   readonly client: Redis;
 
   constructor() {
@@ -14,6 +15,9 @@ export class RedisService implements OnModuleDestroy {
       maxRetriesPerRequest: 2,
       lazyConnect: false,
     });
+    // 必须监听 'error'：ioredis 连接/重连失败会 emit('error')，无监听者时按 Node EventEmitter
+    // 语义会抛未捕获异常（可能直接崩进程），且重连失败将无从观测。
+    this.client.on('error', (e) => this.logger.error(`Redis 连接错误：${e.message}`));
   }
 
   /** 尝试加锁，成功返回 token，失败返回 null。 */

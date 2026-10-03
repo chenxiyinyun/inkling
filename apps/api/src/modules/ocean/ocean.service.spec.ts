@@ -3,7 +3,7 @@ import { LetterStatus, ReviewAction } from '@prisma/client';
 import { OceanService } from './ocean.service';
 
 /**
- * reply() 回归测试（见 docs/代码审计与迭代计划.md §1）：
+ * reply() 回归测试（见 docs/设计文档.md）：
  *  - P0 拆封后回信"复活"已回池信的竞态
  *  - P0 中危 REVIEW 内容必须被拦截
  *  - P1 拉黑双方不得结缘

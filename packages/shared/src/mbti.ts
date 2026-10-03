@@ -1,4 +1,4 @@
-/** MBTI 16 型 + 未知（自报型号，详见 docs/匹配落地-自报MBTI.md） */
+/** MBTI 16 型 + 未知（自报型号，详见 docs/设计文档.md） */
 export const MBTI_TYPES = [
   'INTJ', 'INTP', 'ENTJ', 'ENTP',
   'INFJ', 'INFP', 'ENFJ', 'ENFP',
@@ -35,7 +35,7 @@ export function mbtiSimilarity(a: MbtiType, b: MbtiType): number {
 
 /**
  * 荣格认知功能互补的"黄金互补对"（双向）。命中给高分，而非简单字母取反。
- * 详见 docs/匹配落地-自报MBTI.md。
+ * 详见 docs/设计文档.md。
  */
 const GOLDEN_COMPLEMENT_PAIRS: ReadonlyArray<readonly [MbtiType, MbtiType]> = [
   ['INFJ', 'ENFP'], ['INTJ', 'ENTP'], ['INFP', 'ENFJ'], ['INTP', 'ENTJ'],

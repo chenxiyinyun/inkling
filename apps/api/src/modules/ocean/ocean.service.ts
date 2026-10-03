@@ -176,7 +176,15 @@ export class OceanService {
     await this.quota.consume(userId, 'unseal');
 
     const lockKey = `unseal:${fishing.letterId}`;
-    const token = await this.redis.acquireLock(lockKey, 10);
+    let token: string | null;
+    try {
+      token = await this.redis.acquireLock(lockKey, 10);
+    } catch (e) {
+      // Redis 异常（连接失败等）：退还已扣配额，避免每日唯一拆封额度被静默吞掉
+      this.logger.error(`拆封取锁失败：${e}`);
+      await this.quota.refund(userId, 'unseal');
+      throw new BadRequestException({ code: 'UNSEAL_BUSY', message: '这封信正被处理，稍候再试' });
+    }
     if (!token) {
       await this.quota.refund(userId, 'unseal');
       throw new BadRequestException({ code: 'UNSEAL_BUSY', message: '这封信正被处理，稍候再试' });
@@ -255,7 +263,7 @@ export class OceanService {
     const relation = await this.prisma.$transaction(async (tx) => {
       // 条件更新 + count 校验：与 scheduler 的 7 天回收存在竞态，
       // 若信已被回池/归档（不再 SEALED_OPEN），这里 count===0 → 抛错回滚整个事务，
-      // 杜绝"已回池的信被回信复活成 PAIRED"。见 docs/代码审计与迭代计划.md §1。
+      // 杜绝"已回池的信被回信复活成 PAIRED"。见 docs/设计文档.md。
       const paired = await tx.letter.updateMany({
         where: { id: unseal.letterId, status: LetterStatus.SEALED_OPEN },
         data: { status: LetterStatus.PAIRED },

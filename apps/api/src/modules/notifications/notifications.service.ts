@@ -5,7 +5,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 
 /**
  * 系统通知（弱通知，去人格化）。MVP 用前端轮询消费；生产期叠加 WebSocket/Web Push。
- * ref 只存公开 id，绝不含对方身份（致命级约束，见 docs/API设计.md §4.3）。
+ * ref 只存公开 id，绝不含对方身份（致命级约束，见 docs/设计文档.md）。
  */
 @Injectable()
 export class NotificationsService {

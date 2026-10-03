@@ -20,7 +20,7 @@ export interface AgeDecision {
 }
 
 /**
- * 据生日与门控阈值派生年龄分级（纯函数，未成年人保护核心判定，见 docs/安全与未成年人保护.md）。
+ * 据生日与门控阈值派生年龄分级（纯函数，未成年人保护核心判定，见 docs/设计文档.md）。
  * belowFloor → CHILD（婉拒）；[hardFloor, guardianBelow) → TEEN（守护模式）；>=guardianBelow → ADULT。
  */
 export function deriveAgeDecision(

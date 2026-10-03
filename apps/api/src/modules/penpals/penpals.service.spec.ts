@@ -3,7 +3,7 @@ import { ReviewAction } from '@prisma/client';
 import { PenpalsService } from './penpals.service';
 
 /**
- * send() 回归测试（见 docs/代码审计与迭代计划.md §1）：
+ * send() 回归测试（见 docs/设计文档.md）：
  *  - P1 拉黑后不得再发信（直接查 Block 表兜底，不依赖关系状态同步）
  *  - P0 中危 REVIEW 内容必须被拦截
  */

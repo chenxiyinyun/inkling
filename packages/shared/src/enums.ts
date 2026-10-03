@@ -4,7 +4,7 @@
  *    修改时请保持两边同步。
  */
 
-/** 信件状态机（详见 docs/产品设计文档.md §1.1） */
+/** 信件状态机（详见 docs/设计文档.md） */
 // REVIEWING/RECYCLED/DIMMED/FROZEN 为预留态：MVP 暂无写入方，保留以对接路线图功能。
 // 成员集合须与 prisma/schema.prisma 的 LetterStatus 一致（apps/api 的 enum-drift.spec.ts 守护）。
 export enum LetterStatus {
@@ -21,7 +21,7 @@ export enum LetterStatus {
   FROZEN = 'FROZEN', // 预留：违规冻结（MVP 不写入）
 }
 
-/** 年龄分级（未成年人保护，详见 docs/安全与未成年人保护.md） */
+/** 年龄分级（未成年人保护，详见 docs/设计文档.md） */
 export enum AgeTier {
   CHILD = 'CHILD', // 低于法定最低年龄 → 婉拒
   TEEN = 'TEEN', // 13–17，进入守护模式
@@ -87,7 +87,7 @@ export enum MatchPreference {
 }
 
 /**
- * 系统通知类型（仅"抵达类"弱通知，遵循去人格化；详见 docs/API设计.md §4.3）。
+ * 系统通知类型（仅"抵达类"弱通知，遵循去人格化；详见 docs/设计文档.md）。
  * 成员集合须与 prisma/schema.prisma 的 NotificationType 一致（enum-drift.spec.ts 守护）。
  */
 export enum NotificationType {

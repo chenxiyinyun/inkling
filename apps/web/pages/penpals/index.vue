@@ -5,11 +5,13 @@ const api = useApi();
 const toast = useToast();
 const penpals = ref<PenPalSummary[]>([]);
 const loading = ref(true);
+const failed = ref(false);
 
 onMounted(async () => {
   try {
     penpals.value = await api.get<PenPalSummary[]>('/penpals');
   } catch (e: any) {
+    failed.value = true;
     toast.error(e.message);
   } finally {
     loading.value = false;
@@ -23,6 +25,8 @@ onMounted(async () => {
     <p class="mt-1 text-sm text-inkSoft">与你结缘的人，慢慢往来。</p>
 
     <PageLoading v-if="loading" />
+
+    <EmptyState v-else-if="failed" icon="🌫" title="信匣暂时打不开。" hint="稍后再试一次。" />
 
     <EmptyState v-else-if="penpals.length === 0" icon="🕊" title="还没有笔友。" hint="去漂流海，拆开一封信，回信结缘吧。" />
 

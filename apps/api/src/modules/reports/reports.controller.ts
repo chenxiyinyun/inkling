@@ -3,6 +3,7 @@ import { CurrentUser, AuthUser } from '../../common/decorators/current-user.deco
 import { ReportsService } from './reports.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { CreateAppealDto } from './dto/create-appeal.dto';
+import { BlockUserDto } from './dto/block-user.dto';
 
 @Controller()
 export class ReportsController {
@@ -14,8 +15,8 @@ export class ReportsController {
   }
 
   @Post('blocks')
-  block(@CurrentUser() user: AuthUser, @Body('targetPublicId') targetPublicId: string) {
-    return this.reports.block(user.userId, targetPublicId);
+  block(@CurrentUser() user: AuthUser, @Body() dto: BlockUserDto) {
+    return this.reports.block(user.userId, dto.targetPublicId);
   }
 
   @Delete('blocks/:targetPublicId')

@@ -28,11 +28,26 @@ export interface AppConfig {
 
 const num = (v: string | undefined, d: number) => (v ? Number(v) : d);
 
+/**
+ * JWT 密钥解析：生产环境必须显式提供强随机值，缺失/默认/过短一律拒绝启动
+ * （否则会以公开的 'dev-secret-change-me' 签发 token，任何人可伪造身份）。
+ * 非生产保留开发兜底，方便本地零配置起步。
+ */
+function resolveJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (process.env.NODE_ENV === 'production') {
+    if (!secret || secret === 'dev-secret-change-me' || secret.length < 32) {
+      throw new Error('[配置错误] 生产环境必须设置 JWT_SECRET（≥32 位强随机串，且不得为默认值）');
+    }
+  }
+  return secret ?? 'dev-secret-change-me';
+}
+
 export default (): AppConfig => ({
   port: num(process.env.API_PORT, 3001),
   webOrigin: (process.env.WEB_ORIGIN ?? 'http://localhost:3000').split(','),
   jwt: {
-    secret: process.env.JWT_SECRET ?? 'dev-secret-change-me',
+    secret: resolveJwtSecret(),
     accessTtl: process.env.JWT_ACCESS_TTL ?? '15m',
     refreshTtl: process.env.JWT_REFRESH_TTL ?? '30d',
   },

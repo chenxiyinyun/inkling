@@ -6,7 +6,7 @@ import { deliveryDelayMs, deliveryVehicleLabel } from './delivery.timing';
  * 递送计算助手。
  * - 信件入海：无收件人、距离未知，用固定短延时演示"漂入海面"。
  * - 笔友往来：按真实距离 baseHours 精算在途时长（缩放因子见 deliveryHoursScale）。
- * 生产期再叠加 RabbitMQ 延时队列做秒级叫醒，详见 docs/产品设计文档.md §2.6 / §6.3。
+ * 生产期再叠加 RabbitMQ 延时队列做秒级叫醒，详见 docs/设计文档.md。
  */
 @Injectable()
 export class DeliveryService {

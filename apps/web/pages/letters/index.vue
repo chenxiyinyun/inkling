@@ -5,11 +5,13 @@ const api = useApi();
 const toast = useToast();
 const letters = ref<MyLetter[]>([]);
 const loading = ref(true);
+const failed = ref(false);
 
 onMounted(async () => {
   try {
     letters.value = await api.get<MyLetter[]>('/letters');
   } catch (e: any) {
+    failed.value = true;
     toast.error(e.message);
   } finally {
     loading.value = false;
@@ -23,6 +25,8 @@ onMounted(async () => {
     <p class="mt-1 text-sm text-inkSoft">你寄出的每一份心意，都在路上。</p>
 
     <PageLoading v-if="loading" />
+
+    <EmptyState v-else-if="failed" icon="🌫" title="信袋暂时打不开。" hint="稍后再试一次。" />
 
     <EmptyState v-else-if="letters.length === 0" icon="📭" title="还没有寄出过信。" hint="写下第一封，交给大海吧。" />
 

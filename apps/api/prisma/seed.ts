@@ -4,7 +4,7 @@ import * as bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 // 运营种子信（署名"漂流邮局"，透明标注）——解决冷启动期"放漂无信可捞"。
-// 详见 docs/产品设计文档.md §1.7 / §8.1。
+// 详见 docs/设计文档.md。
 const SEEDS = [
   { email: 'lin@inkling.dev', penName: '林间有风', mbti: 'INFP', tags: ['阅读', '独处', '诗'], geohash5: 'wecpk', oneLiner: '在异乡，靠一杯热茶过冬。',
     body: '亲爱的陌生人：最近我搬到了一座总在下雨的城市，窗台上的绿萝倒是越长越好。你那边，今天是什么天气？有没有一件最近让你慢下来的小事，想说给一个不认识的人听？' },
@@ -21,7 +21,12 @@ const SEEDS = [
 ];
 
 async function main() {
-  const passwordHash = await bcrypt.hash('inkling123', 10);
+  // 防误伤：生产环境拒绝注入弱口令种子账号（确需时显式 ALLOW_SEED=1 并配合 SEED_PASSWORD）。
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_SEED !== '1') {
+    throw new Error('[seed] 拒绝在生产环境写入种子账号；如确需，请设 ALLOW_SEED=1 并改用 SEED_PASSWORD。');
+  }
+  const seedPassword = process.env.SEED_PASSWORD ?? 'inkling123';
+  const passwordHash = await bcrypt.hash(seedPassword, 10);
   const now = Date.now();
 
   for (const s of SEEDS) {
@@ -70,7 +75,9 @@ async function main() {
     });
   }
 
-  console.log(`✓ 已注入 ${SEEDS.length} 位种子写信人与漂流信（默认密码 inkling123）`);
+  console.log(
+    `✓ 已注入 ${SEEDS.length} 位种子写信人与漂流信（密码：${process.env.SEED_PASSWORD ? '由 SEED_PASSWORD 提供' : 'inkling123（默认，仅用于本地/演示）'}）`,
+  );
 }
 
 main()

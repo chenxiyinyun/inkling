@@ -5,12 +5,30 @@
 {$SITE_ADDRESS} {
 	encode zstd gzip
 
-	# 后端 API：/v1/* 反代到 api 容器（保留 /v1 前缀，与 Nest 全局前缀一致）
-	@api path /v1/*
-	reverse_proxy @api api:3001
+	log {
+		output stdout
+		format json
+	}
 
-	# 前端 SPA：静态资源 + history 模式回退到 index.html
-	root * /srv
-	try_files {path} /index.html
-	file_server
+	# 基础安全响应头（HSTS 仅在 HTTPS 下被浏览器采纳）
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	# ⚠️ 必须用互斥 handle 块分隔 API 与 SPA：
+	# Caddy 默认指令顺序中 try_files 先于 reverse_proxy。若裸写 `try_files {path} /index.html`
+	# 会把 /v1/*（磁盘上不存在）重写为 /index.html，随后 @api 路径匹配器失效、
+	# reverse_proxy 被跳过，file_server 返回前端 HTML —— API 全部不可达。
+	handle /v1/* {
+		reverse_proxy api:3001
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
 }

@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { INestApplication } from '@nestjs/common';
-import { PenaltyType, UserStatus } from '@prisma/client';
+import { LetterStatus, PenaltyType, UserStatus } from '@prisma/client';
 import { createTestApp } from '../helpers/app';
 import { resetDb } from '../helpers/db';
 import { http, registerAdult, CLEAN_LETTER } from '../helpers/http';
 import { PrismaService } from '../../src/common/prisma/prisma.service';
+import { UsersService } from '../../src/modules/users/users.service';
 
 // >50 字且含联系方式（微信 + 号码）→ 归一化后命中 HIGH → BLOCK
 const BLOCK_LETTER =
@@ -107,5 +108,62 @@ describe('风控闭环 + GDPR e2e（真实 PG）', () => {
     expect(Array.isArray(data.letters)).toBe(true);
     expect(data.letters[0].body).toBe(CLEAN_LETTER);
     expect(Array.isArray(data.penpals)).toBe(true);
+  });
+
+  it('存量 access token 对「已冻结」账号立即失效（403 ACCOUNT_FROZEN，无需等 token 过期）', async () => {
+    const u = await registerAdult(app);
+    await http(app).get('/v1/me').set('Authorization', `Bearer ${u.token}`).expect(200);
+
+    const dbUser = await prisma.user.findUnique({ where: { publicId: u.publicId } });
+    await prisma.user.update({
+      where: { id: dbUser!.id },
+      data: { status: UserStatus.FROZEN, frozenUntil: new Date(Date.now() + 3_600_000) },
+    });
+
+    const res = await http(app).get('/v1/me').set('Authorization', `Bearer ${u.token}`).expect(403);
+    expect(res.body.error.code).toBe('ACCOUNT_FROZEN');
+  });
+
+  it('被冻结账号的 refresh token 也无法续签（403 ACCOUNT_FROZEN）', async () => {
+    const u = await registerAdult(app);
+    const dbUser = await prisma.user.findUnique({ where: { publicId: u.publicId } });
+    await prisma.user.update({
+      where: { id: dbUser!.id },
+      data: { status: UserStatus.FROZEN, frozenUntil: new Date(Date.now() + 3_600_000) },
+    });
+
+    const res = await http(app).post('/v1/auth/token/refresh').send({ refreshToken: u.refreshToken }).expect(403);
+    expect(res.body.error.code).toBe('ACCOUNT_FROZEN');
+  });
+
+  it('GDPR 注销执行器：匿名化 + DELETED + 漂流信归档，重复登记幂等', async () => {
+    const u = await registerAdult(app);
+    await http(app).post('/v1/letters/compose').set('Authorization', `Bearer ${u.token}`).send({ body: CLEAN_LETTER }).expect(201);
+    await http(app).delete('/v1/me').set('Authorization', `Bearer ${u.token}`).expect(200);
+    // 幂等：再次请求不新增登记行
+    await http(app).delete('/v1/me').set('Authorization', `Bearer ${u.token}`).expect(200);
+
+    const requests = await prisma.dataDeletionRequest.count();
+    expect(requests).toBe(1);
+
+    const users = app.get(UsersService, { strict: false });
+    expect(await users.processDeletionRequests()).toBe(1);
+
+    const dbUser = await prisma.user.findUnique({ where: { publicId: u.publicId } });
+    expect(dbUser!.status).toBe(UserStatus.DELETED);
+    expect(dbUser!.email).toBeNull();
+    expect(dbUser!.phone).toBeNull();
+
+    const profile = await prisma.userProfile.findUnique({ where: { userId: dbUser!.id } });
+    expect(profile!.penName).toBe('已注销的旅人');
+    expect(profile!.geohash5).toBeNull();
+
+    const letters = await prisma.letter.findMany({ where: { authorId: dbUser!.id } });
+    expect(letters.length).toBe(1);
+    expect(letters[0].status).toBe(LetterStatus.ARCHIVED);
+
+    const reqRow = await prisma.dataDeletionRequest.findFirst({ where: { userId: dbUser!.id } });
+    expect(reqRow!.status).toBe('DONE');
+    expect(reqRow!.processedAt).not.toBeNull();
   });
 });

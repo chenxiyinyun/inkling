@@ -10,9 +10,10 @@ node_modules
 **/.cache
 *.tsbuildinfo
 
-# 密钥：绝不进镜像层
+# 密钥：绝不进镜像层（含 deploy 下的生产 env 模板）
 .env
 .env.*
+deploy/env*.example
 
 # 杂项
 coverage

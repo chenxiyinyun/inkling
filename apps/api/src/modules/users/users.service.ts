@@ -1,5 +1,7 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { AgeTier } from '@prisma/client';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { AgeTier, DeletionStatus, LetterStatus, RelationStatus, UserStatus } from '@prisma/client';
+import { randomBytes } from 'node:crypto';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { encodeGeohash, geohashDistanceKm, distanceLabel } from '../../common/geo/geohash.util';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -7,6 +9,8 @@ import { UpdateSettingsDto } from './dto/update-settings.dto';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async getMe(userId: string) {
@@ -87,7 +91,7 @@ export class UsersService {
 
   /** GDPR 数据可携：全量结构化 JSON 导出（含信件正文、笔友往来、举报与处罚）。 */
   async exportData(userId: string) {
-    const [user, letters, relations, unseals, fishings, reportsMade, penalties, blocks, appeals, deletionReqs] =
+    const [user, letters, relations, unseals, fishings, reportsMade, penalties, blocks, appeals, deletionReqs, notifications, dailyQuotas] =
       await Promise.all([
         this.prisma.user.findUnique({ where: { id: userId }, include: { profile: true, parentalConsent: true } }),
         this.prisma.letter.findMany({ where: { authorId: userId }, orderBy: { createdAt: 'asc' } }),
@@ -102,6 +106,8 @@ export class UsersService {
         this.prisma.block.findMany({ where: { userId }, include: { target: { select: { publicId: true } } } }),
         this.prisma.appeal.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
         this.prisma.dataDeletionRequest.findMany({ where: { userId } }),
+        this.prisma.notification.findMany({ where: { userId }, orderBy: { createdAt: 'asc' }, take: 200 }),
+        this.prisma.dailyQuota.findMany({ where: { userId }, orderBy: { date: 'asc' }, take: 400 }),
       ]);
 
     return {
@@ -162,13 +168,94 @@ export class UsersService {
       })),
       blocks: blocks.map((b) => ({ targetPublicId: b.target.publicId, createdAt: b.createdAt.toISOString() })),
       deletionRequests: deletionReqs.map((d) => ({ status: d.status, requestedAt: d.requestedAt.toISOString() })),
+      notifications: notifications.map((n) => ({ type: n.type, title: n.title, ref: n.ref, read: n.read, createdAt: n.createdAt.toISOString() })),
+      quotas: dailyQuotas.map((q) => ({ date: q.date, sendLeft: q.sendLeft, fishLeft: q.fishLeft, unsealLeft: q.unsealLeft })),
       note: '本导出为完整结构化 JSON；异步打包成文件下载（对象存储）留待 C 档。',
     };
   }
 
-  /** GDPR 删除权：登记删除请求（异步处理）。 */
+  /** GDPR 删除权：登记删除请求（幂等；由 UsersDeletionProcessor 定时推进执行）。 */
   async requestDeletion(userId: string) {
-    await this.prisma.dataDeletionRequest.create({ data: { userId } });
+    const existing = await this.prisma.dataDeletionRequest.findFirst({
+      where: { userId, status: { in: [DeletionStatus.PENDING, DeletionStatus.PROCESSING] } },
+      select: { id: true },
+    });
+    if (!existing) {
+      await this.prisma.dataDeletionRequest.create({ data: { userId } });
+    }
     return { requested: true, message: '已登记注销请求，我们将在合规期限内处理。' };
+  }
+
+  /**
+   * 删除请求执行器（由 UsersDeletionProcessor 定时调用）。
+   * 采用「匿名化 + 注销」而非物理删除：多数外键为 RESTRICT，物理删除需跨 10+ 张表编排，
+   * 且会连带销毁他人收件箱内容。执行内容：
+   *  ① 抹除账号标识（email/phone/密码随机化）并置 DELETED（禁止登录）；
+   *  ② 抹除名片 PII（笔名/一句话/兴趣/粗粒度区域），他人视角降级为「已注销的旅人」；
+   *  ③ 停止其漂流中的信（在途/在池/被预览/待回信 → 归档；已结缘 PAIRED 保留）；
+   *  ④ 封存笔友关系、清通知/监护人同意/双向拉黑，登记请求置 DONE。
+   * 信件与笔友往来正文保留（收件方权益），但已与可识别身份解绑。
+   */
+  async processDeletionRequests(): Promise<number> {
+    const pending = await this.prisma.dataDeletionRequest.findMany({
+      where: { status: DeletionStatus.PENDING },
+      orderBy: { requestedAt: 'asc' },
+      take: 20,
+    });
+
+    let processed = 0;
+    for (const req of pending) {
+      // 认领（幂等防重）：仅在仍为 PENDING 时推进为 PROCESSING
+      const claimed = await this.prisma.dataDeletionRequest.updateMany({
+        where: { id: req.id, status: DeletionStatus.PENDING },
+        data: { status: DeletionStatus.PROCESSING },
+      });
+      if (claimed.count !== 1) continue;
+
+      // bcrypt 在事务外计算，避免长时间占用事务
+      const randomHash = await bcrypt.hash(randomBytes(24).toString('hex'), 10);
+      const now = new Date();
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          await tx.user.updateMany({
+            where: { id: req.userId },
+            data: { email: null, phone: null, passwordHash: randomHash, status: UserStatus.DELETED, frozenUntil: null },
+          });
+          await tx.userProfile.updateMany({
+            where: { userId: req.userId },
+            data: { penName: '已注销的旅人', mbti: 'UNKNOWN', interestTags: [], oneLiner: null, geohash5: null, invisible: true },
+          });
+          await tx.letter.updateMany({
+            where: {
+              authorId: req.userId,
+              status: {
+                in: [LetterStatus.DELIVERING, LetterStatus.FLOATING, LetterStatus.HOOKED, LetterStatus.SEALED_OPEN],
+              },
+            },
+            data: { status: LetterStatus.ARCHIVED },
+          });
+          await tx.penPalRelation.updateMany({
+            where: { OR: [{ userAId: req.userId }, { userBId: req.userId }], status: RelationStatus.ACTIVE },
+            data: { status: RelationStatus.ARCHIVED },
+          });
+          await tx.parentalConsent.deleteMany({ where: { userId: req.userId } });
+          await tx.notification.deleteMany({ where: { userId: req.userId } });
+          await tx.block.deleteMany({ where: { OR: [{ userId: req.userId }, { targetUserId: req.userId }] } });
+          await tx.dataDeletionRequest.update({
+            where: { id: req.id },
+            data: { status: DeletionStatus.DONE, processedAt: now },
+          });
+        });
+        processed += 1;
+      } catch (e) {
+        this.logger.error(`删除请求执行失败 ${req.id}：${e}`);
+        // 回退为 PENDING，下轮重试
+        await this.prisma.dataDeletionRequest.updateMany({
+          where: { id: req.id, status: DeletionStatus.PROCESSING },
+          data: { status: DeletionStatus.PENDING },
+        });
+      }
+    }
+    return processed;
   }
 }

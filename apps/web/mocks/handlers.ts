@@ -2,7 +2,7 @@
  * 假后端路由表（见 db.ts）。每条 handler 返回的就是 useApi 解包后的 data；
  * 失败抛 MockError，由 dispatch 包成 ofetch 风格错误（带 response.status 与 data.error）。
  */
-import { LetterStatus, RelationStatus, timeBand } from '@inkling/shared';
+import { AgeTier, LetterStatus, RelationStatus, timeBand } from '@inkling/shared';
 import type { LetterPreview, MeProfile, MyLetter, NotificationItem, PenPalSummary, PublicProfile, QuotaToday } from '@inkling/shared';
 import { db, save, nextId, resetsAtUtc, findProfile, type PoolLetter, type StoredNotification } from './db';
 
@@ -73,7 +73,24 @@ const routes: Route[] = [
     pattern: /^\/auth\/register$/,
     run: ({ body }) => {
       const s = db();
-      s.me.penName = body?.penName || s.me.penName;
+      // 对齐真实后端 RegisterDto（email + password≥8 + penName + birthDate）与年龄硬门控
+      const email = String(body?.email ?? '');
+      const password = String(body?.password ?? '');
+      const penName = String(body?.penName ?? '').trim();
+      const birthDate = String(body?.birthDate ?? '');
+      if (!email || !/^\S+@\S+\.\S+$/.test(email)) throw new MockError(400, 'VALIDATION_FAILED', '请填写有效的邮箱');
+      if (password.length < 8) throw new MockError(400, 'VALIDATION_FAILED', '密码至少 8 位');
+      if (!penName) throw new MockError(400, 'VALIDATION_FAILED', '请填写笔名');
+      const birth = new Date(birthDate);
+      if (!birthDate || Number.isNaN(birth.getTime())) throw new MockError(400, 'VALIDATION_FAILED', '请填写出生日期');
+      const now = new Date();
+      let age = now.getFullYear() - birth.getFullYear();
+      const m = now.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+      if (age < 13) throw new MockError(403, 'AGE_BELOW_FLOOR', '漂流邮局暂时不能为你开启航行。待你长大些，海面会一直在。');
+      s.me.penName = penName;
+      s.me.ageTier = age < 18 ? AgeTier.TEEN : AgeTier.ADULT;
+      s.me.guardianMode = age < 18;
       s.me.mbti = 'UNKNOWN';
       s.me.interestTags = [];
       s.me.oneLiner = undefined;
@@ -96,7 +113,8 @@ const routes: Route[] = [
       if (body?.penName != null) me.penName = body.penName;
       if (body?.mbti != null) me.mbti = body.mbti;
       if (Array.isArray(body?.interestTags)) me.interestTags = body.interestTags;
-      me.oneLiner = body?.oneLiner || undefined;
+      // 对齐真实后端：字段缺省时保持原值，空串才清除
+      if (body?.oneLiner !== undefined) me.oneLiner = body.oneLiner || undefined;
       if (body?.lat != null && body?.lng != null) me.region = '已记录大致海域';
       save();
       return me;
@@ -153,6 +171,7 @@ const routes: Route[] = [
       if (s.quota.send <= 0) throw new MockError(403, 'QUOTA_EXHAUSTED', '今日漂流瓶已用尽，明日潮汐再启');
       const text = String(body?.body ?? '');
       if (text.trim().length < 50) throw new MockError(400, 'LETTER_TOO_SHORT', '再多写几句吧（至少 50 字）');
+      if (text.length > 1000) throw new MockError(400, 'LETTER_TOO_LONG', '一封信最多 1000 字');
       s.quota.send -= 1;
       const letter: MyLetter = {
         letterId: nextId('L'),
@@ -236,13 +255,17 @@ const routes: Route[] = [
       const unseal = s.unseals.find((u) => u.unsealId === params.id);
       if (!unseal) throw new MockError(404, 'UNSEAL_NOT_FOUND', '找不到这封待回的信');
       if (new Date(unseal.replyDeadline) < new Date()) throw new MockError(400, 'WINDOW_CLOSED', '回信潮汐已过，信重新漂回了海面');
+      // 对齐真实后端 ReplyDto：50–1000 字
+      const text = String(body?.body ?? '');
+      if (text.trim().length < 50) throw new MockError(400, 'REPLY_TOO_SHORT', '回信也多写几句吧（至少 50 字）');
+      if (text.length > 1000) throw new MockError(400, 'REPLY_TOO_LONG', '回信最多 1000 字');
       const partner = findProfile(unseal.authorPublicId)!;
       const now = Date.now();
       const relationId = nextId('rel');
       s.relations.unshift({ relationId, partner, status: RelationStatus.ACTIVE, exchangeCount: 1, lastLetterAt: new Date(now).toISOString() });
       // 原信作为对方寄来（已送达）+ 我的回信（已送达）
       s.correspondences.push({ id: nextId('c'), relationId, mine: false, body: unseal.body, deliverAt: now - 1000, createdAt: new Date(now - 2000).toISOString() });
-      s.correspondences.push({ id: nextId('c'), relationId, mine: true, body: String(body?.body ?? ''), deliverAt: now - 500, createdAt: new Date(now).toISOString() });
+      s.correspondences.push({ id: nextId('c'), relationId, mine: true, body: text, deliverAt: now - 500, createdAt: new Date(now).toISOString() });
       // 信已结缘，移出漂流池
       s.pool = s.pool.filter((p) => p.letterId !== unseal.letterId);
       save();
@@ -275,9 +298,13 @@ const routes: Route[] = [
       const s = db();
       const rel = s.relations.find((r) => r.relationId === params.id);
       if (!rel) throw new MockError(404, 'RELATION_NOT_FOUND', '找不到这段信缘');
+      // 对齐真实后端 SendCorrespondenceDto：1–2000 字
+      const text = String(body?.body ?? '');
+      if (!text.trim()) throw new MockError(400, 'LETTER_TOO_SHORT', '写点什么再寄出吧');
+      if (text.length > 2000) throw new MockError(400, 'LETTER_TOO_LONG', '一封信最多 2000 字');
       const now = Date.now();
       const deliverAt = now + 8000; // 8 秒在途，便于看到"信鸽在路上"
-      s.correspondences.push({ id: nextId('c'), relationId: rel.relationId, mine: true, body: String(body?.body ?? ''), deliverAt, createdAt: new Date(now).toISOString() });
+      s.correspondences.push({ id: nextId('c'), relationId: rel.relationId, mine: true, body: text, deliverAt, createdAt: new Date(now).toISOString() });
       rel.exchangeCount += 1;
       rel.lastLetterAt = new Date(now).toISOString();
       save();

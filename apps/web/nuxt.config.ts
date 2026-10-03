@@ -8,7 +8,7 @@ export default defineNuxtConfig({
     '@inkling/shared': fileURLToPath(new URL('../../packages/shared/src/index.ts', import.meta.url)),
   },
   // MVP 暂用 SPA（登录后应用，规避 SSR + 本地 token 复杂度）。
-  // 生产期可切回 SSR 以获得分享秒开/SEO（详见 docs/产品设计文档.md）。
+  // 生产期可切回 SSR 以获得分享秒开/SEO（详见 docs/设计文档.md）。
   ssr: false,
 
   modules: [

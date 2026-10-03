@@ -76,7 +76,7 @@ export interface QuotaToday {
 
 /**
  * 系统通知条目（去人格化弱通知）。ref 仅含公开 id，绝不含对方身份。
- * 字段与 docs/API设计.md §2.12 对齐（codebase 统一用 camelCase）。
+ * 字段与 docs/设计文档.md 对齐（codebase 统一用 camelCase）。
  */
 export interface NotificationItem {
   publicId: string;

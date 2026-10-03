@@ -4,12 +4,15 @@ import { useAuthStore } from '~/stores/auth';
 
 const api = useApi();
 const auth = useAuthStore();
+const toast = useToast();
 const loading = ref(!auth.me);
 
 onMounted(async () => {
   if (!auth.me) {
     try {
       auth.setMe(await api.get('/me'));
+    } catch (e: any) {
+      toast.error(e.message);
     } finally {
       loading.value = false;
     }

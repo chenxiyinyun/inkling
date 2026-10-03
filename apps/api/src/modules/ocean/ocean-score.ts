@@ -1,7 +1,7 @@
 import { mbtiAffinity, MbtiValue } from '@inkling/shared';
 
 /**
- * 打捞推荐打分（纯函数，便于单测；见 docs/代码审计与迭代计划.md §2.B）。
+ * 打捞推荐打分（纯函数，便于单测；见 docs/设计文档.md）。
  * 综合分 = 0.4·MBTI亲和 + 0.35·兴趣Jaccard + 0.25·地理就近。
  */
 export const SCORE_WEIGHTS = { affinity: 0.4, interest: 0.35, geo: 0.25 } as const;

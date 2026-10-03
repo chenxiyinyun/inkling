@@ -1,6 +1,6 @@
 import { DeliveryVehicle } from './enums';
 
-/** 慢社交节奏默认参数（可被后端 env 覆盖；详见 docs/产品设计文档.md） */
+/** 慢社交节奏默认参数（可被后端 env 覆盖；详见 docs/设计文档.md） */
 export const QUOTA_DEFAULTS = {
   dailySend: 1,
   dailyFish: 3,
@@ -24,13 +24,13 @@ export const LETTER_MAX_CHARS = 1000;
 /** 打捞预览露出的正文字数 */
 export const PREVIEW_BODY_CHARS = 60;
 
-/** 年龄门控（各地法定最低见 docs/合规与本地化-海外.md） */
+/** 年龄门控（各地法定最低见 docs/设计文档.md） */
 export const MIN_AGE_HARD_FLOOR = 13;
 export const GUARDIAN_MODE_BELOW_AGE = 18;
 
 /**
  * 真实地理距离 → 递送工具与基准时长（小时）。
- * MVP 用粗档；生产期按 docs/产品设计文档.md §2.6 公式精算。
+ * MVP 用粗档；生产期按 docs/设计文档.md 公式精算。
  */
 export interface DeliveryTier {
   vehicle: DeliveryVehicle;

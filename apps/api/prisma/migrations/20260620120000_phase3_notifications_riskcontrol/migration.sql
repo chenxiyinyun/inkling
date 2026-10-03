@@ -10,8 +10,11 @@ CREATE TYPE "NotificationType" AS ENUM ('LETTER_DELIVERED', 'LETTER_FISHED', 'PE
 -- AlterTable
 ALTER TABLE "unseal_records" ADD COLUMN     "warnedAt" TIMESTAMP(3);
 
--- AlterTable
-ALTER TABLE "penalties" ADD COLUMN     "publicId" TEXT NOT NULL;
+-- AlterTable（三步走：可空 → 回填 → 置 NOT NULL。
+-- 直接 ADD COLUMN "publicId" TEXT NOT NULL 在「已有处罚记录」的库上会报 null 值错误导致 migrate deploy 中断）
+ALTER TABLE "penalties" ADD COLUMN     "publicId" TEXT;
+UPDATE "penalties" SET "publicId" = gen_random_uuid()::text WHERE "publicId" IS NULL;
+ALTER TABLE "penalties" SET NOT NULL;
 
 -- CreateTable
 CREATE TABLE "appeals" (

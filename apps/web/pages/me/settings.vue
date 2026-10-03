@@ -15,6 +15,8 @@ onMounted(async () => {
   if (!auth.me) {
     try {
       auth.setMe(await api.get('/me'));
+    } catch (e: any) {
+      toast.error(e.message);
     } finally {
       loading.value = false;
     }

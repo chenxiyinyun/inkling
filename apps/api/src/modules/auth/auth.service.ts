@@ -25,7 +25,7 @@ export class AuthService {
     const guardianBelow = this.config.get<number>('guardianModeBelowAge') ?? 18;
     const { tier: ageTier, isMinor, belowFloor } = deriveAgeDecision(new Date(dto.birthDate), hardFloor, guardianBelow);
 
-    // 年龄硬门控（未成年人保护，详见 docs/安全与未成年人保护.md）
+    // 年龄硬门控（未成年人保护，详见 docs/设计文档.md）
     if (belowFloor) {
       throw new ForbiddenException({
         code: 'AGE_BELOW_FLOOR',
@@ -76,6 +76,7 @@ export class AuthService {
     });
     if (!user) throw new UnauthorizedException({ code: 'INVALID_CREDENTIALS', message: '账号或密码不对' });
     if (user.status === UserStatus.BANNED) throw new ForbiddenException({ code: 'BANNED', message: '账号已被封禁' });
+    if (user.status === UserStatus.DELETED) throw new ForbiddenException({ code: 'ACCOUNT_DELETED', message: '账号已注销' });
 
     const ok = await bcrypt.compare(dto.password, user.passwordHash);
     if (!ok) throw new UnauthorizedException({ code: 'INVALID_CREDENTIALS', message: '账号或密码不对' });
@@ -104,14 +105,34 @@ export class AuthService {
     return { accessToken, refreshToken, publicId: user.publicId };
   }
 
+  /**
+   * 刷新令牌。除验签外必须：
+   *  ① 仅接受 type=refresh 的令牌（access token 不得当 refresh 用）；
+   *  ② 复核账号状态——否则被冻结/封禁/注销的账号可凭存量 refresh token 无限续签，绕过风控。
+   */
   async refresh(refreshToken: string) {
+    let payload: { sub: string; type?: string };
     try {
-      const payload = this.jwt.verify(refreshToken);
-      const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
-      if (!user) throw new Error('no user');
-      return this.issueTokens(user);
+      payload = this.jwt.verify(refreshToken);
     } catch {
       throw new UnauthorizedException({ code: 'INVALID_REFRESH', message: '请重新登录' });
     }
+    if (payload.type !== 'refresh') throw new UnauthorizedException({ code: 'INVALID_REFRESH', message: '请重新登录' });
+
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user) throw new UnauthorizedException({ code: 'INVALID_REFRESH', message: '请重新登录' });
+    if (user.status === UserStatus.BANNED) throw new ForbiddenException({ code: 'BANNED', message: '账号已被封禁' });
+    if (user.status === UserStatus.DELETED) throw new ForbiddenException({ code: 'ACCOUNT_DELETED', message: '账号已注销' });
+    if (user.status === UserStatus.FROZEN) {
+      if (user.frozenUntil && user.frozenUntil > new Date()) {
+        throw new ForbiddenException({
+          code: 'ACCOUNT_FROZEN',
+          message: `账号因违规被临时冻结，将于 ${user.frozenUntil.toISOString()} 后恢复`,
+        });
+      }
+      await this.prisma.user.update({ where: { id: user.id }, data: { status: UserStatus.ACTIVE, frozenUntil: null } });
+      user.status = UserStatus.ACTIVE;
+    }
+    return this.issueTokens(user);
   }
 }

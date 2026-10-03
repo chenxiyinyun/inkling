@@ -11,8 +11,8 @@ const PRESET_TAGS = ['阅读', '音乐', '旅行', '电影', '手作', '运动',
 const form = reactive({
   penName: auth.me?.penName ?? '',
   mbti: (auth.me?.mbti as string) ?? MBTI_UNKNOWN,
-  tags: [] as string[],
-  oneLiner: '',
+  tags: [...(auth.me?.interestTags ?? [])],
+  oneLiner: auth.me?.oneLiner ?? '',
   lat: undefined as number | undefined,
   lng: undefined as number | undefined,
 });

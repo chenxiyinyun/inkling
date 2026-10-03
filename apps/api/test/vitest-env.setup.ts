@@ -16,9 +16,17 @@ process.env.THROTTLE_DISABLED ??= '1'; // 集成测试从单一 localhost IP 高
 // （throttle.e2e.spec.ts 会在自身 beforeAll 临时置 '0' 开启限流以验证机制，afterAll 复原）
 
 // 安全闸：集成测试会 TRUNCATE 所有表，绝不能误连到开发/生产库。
-// 要求库名包含 "test"（默认 inkling_test 已满足）。
-if (!/test/i.test(process.env.DATABASE_URL)) {
+// 必须精确解析出「库名」再校验（含 "test"）——直接对整条 URL 做子串匹配会被
+// 主机名 / 密码 / 连接参数中的 "test"（如 db.testing.internal、application_name=integrationtest）绕过。
+const testDbName = (() => {
+  try {
+    return new URL(process.env.DATABASE_URL!).pathname.replace(/^\//, '');
+  } catch {
+    return '';
+  }
+})();
+if (!/test/i.test(testDbName)) {
   throw new Error(
-    `[集成测试安全闸] DATABASE_URL 必须指向测试库（库名需含 "test"），以免误清空数据。当前为：${process.env.DATABASE_URL}`,
+    `[集成测试安全闸] DATABASE_URL 的库名必须含 "test"（当前库名：${testDbName || '无法解析'}），以免误清空数据。`,
   );
 }

@@ -1,14 +1,18 @@
 import type { NotificationItem, NotificationPage } from '@inkling/shared';
+import { useAuthStore } from '~/stores/auth';
 
-// 模块级单例轮询器：整个应用只跑一个 interval（AppHeader 常驻，启动一次）。
+// 模块级单例轮询器：整个应用只跑一个 interval（AppHeader 常驻，登录后启动）。
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let watchInstalled = false;
 
 /**
  * 通知中心数据源（弱信号）。useState 单例让 AppHeader 角标与通知页共享同一份响应式数据，
  * 不重复拉取；轮询 45s 一次，契合"慢社交"节奏。失败静默（通知失败不打扰用户）。
+ * 登出即停止轮询并清空：否则登出后仍带空 token 请求 → 反复 401 跳登录。
  */
 export function useNotifications() {
   const api = useApi();
+  const auth = useAuthStore();
   const items = useState<NotificationItem[]>('inkling_notifications', () => []);
   const unread = useState<number>('inkling_notifications_unread', () => 0);
 
@@ -34,11 +38,34 @@ export function useNotifications() {
     }
   }
 
+  function stopPolling() {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function reset() {
+    stopPolling();
+    items.value = [];
+    unread.value = 0;
+  }
+
   function startPolling(intervalMs = 45_000) {
-    if (!import.meta.client || pollTimer) return;
+    if (!import.meta.client) return;
+    if (!watchInstalled) {
+      watchInstalled = true;
+      watch(
+        () => auth.isAuthed,
+        (authed) => {
+          if (!authed) reset();
+        },
+      );
+    }
+    if (pollTimer) return;
     void refresh();
     pollTimer = setInterval(() => void refresh(), intervalMs);
   }
 
-  return { items, unread, refresh, markRead, startPolling };
+  return { items, unread, refresh, markRead, startPolling, stopPolling, reset };
 }

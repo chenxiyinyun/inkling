@@ -51,7 +51,7 @@ export class LettersService {
     }
 
     // 1) 审核（高危秒级先行拦截；BLOCK 与 REVIEW 都不放行——MVP 无人工复核队列，
-    //    脏词/不友善内容一律退回修改，杜绝静默通过。详见 docs/代码审计与迭代计划.md §1）
+    //    脏词/不友善内容一律退回修改，杜绝静默通过。详见 docs/设计文档.md）
     const result = await this.moderation.review(letter.body);
     const reviewId = await this.moderation.logReview(ReviewTargetType.LETTER, letter.id, result);
     if (result.action !== ReviewAction.PASS) {

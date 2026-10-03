@@ -4,6 +4,7 @@ import { Public } from '../../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { RefreshDto } from './dto/refresh.dto';
 
 /** auth 端点每 IP 每分钟上限（比全局更严）：挡密码爆破 / 批量注册。 */
 const AUTH_RATE_LIMIT = 8;
@@ -27,7 +28,7 @@ export class AuthController {
 
   @Public()
   @Post('token/refresh')
-  refresh(@Body('refreshToken') refreshToken: string) {
-    return this.auth.refresh(refreshToken);
+  refresh(@Body() dto: RefreshDto) {
+    return this.auth.refresh(dto.refreshToken);
   }
 }

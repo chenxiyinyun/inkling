@@ -20,13 +20,14 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build:shared
       - run: pnpm db:generate
       - run: pnpm --filter @inkling/api typecheck
       - run: pnpm --filter @inkling/api typecheck:test
+      - run: pnpm --filter @inkling/web typecheck
       - run: pnpm test
 
   integration:
@@ -66,7 +67,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build:shared

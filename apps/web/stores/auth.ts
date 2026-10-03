@@ -1,8 +1,11 @@
 import { defineStore } from 'pinia';
 import type { MeProfile } from '@inkling/shared';
+import { useOceanStore } from './ocean';
+import { useQuotaStore } from './quota';
 
 const TOKEN_KEY = 'inkling_token';
 const REFRESH_KEY = 'inkling_refresh';
+const DRAFT_KEY = 'inkling_letter_draft';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -25,6 +28,7 @@ export const useAuthStore = defineStore('auth', {
     setMe(me: MeProfile) {
       this.me = me;
     },
+    /** 登出必须「彻底」：否则同一标签页换账号可见上一账号的草稿 / 已拆封信件 / 配额角标。 */
     logout() {
       this.token = null;
       this.refreshToken = null;
@@ -32,7 +36,16 @@ export const useAuthStore = defineStore('auth', {
       if (import.meta.client) {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(REFRESH_KEY);
+        // 本机残留：写信草稿 + 打捞流程（后者含已拆封信全文与作者名片）
+        localStorage.removeItem(DRAFT_KEY);
+        sessionStorage.removeItem('inkling_ocean_flow');
       }
+      try {
+        useOceanStore().clear();
+      } catch { /* Pinia 未就绪时忽略（如极早的 401） */ }
+      try {
+        useQuotaStore().$reset();
+      } catch { /* 同上 */ }
     },
   },
 });

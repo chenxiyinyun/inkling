@@ -6,7 +6,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
 /**
- * 时间驱动状态机的"兜底巡检"（详见 docs/产品设计文档.md §6.3）。
+ * 时间驱动状态机的"兜底巡检"（详见 docs/设计文档.md）。
  * MVP 以轮询保证最终一致；生产期叠加 RabbitMQ 延时队列做秒级"叫醒"。
  * 所有流转先读 DB 状态再做条件更新 → 幂等；通知仅在「本 tick 真实发生流转」时发出（count===1），
  * 故 20s 重跑不会重复通知（窗口预警另用 warnedAt 去重）。

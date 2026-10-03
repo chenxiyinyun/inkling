@@ -28,5 +28,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD curl -fsS http://localhost:3001/v1/health/ready || exit 1
 
 # 单实例：启动时应用待执行 migration 后再起服务。
-# ⚠️ 仅在 api 单副本下安全；多副本须改用独立一次性迁移任务（见 docs/部署与运维.md）。
+# ⚠️ 仅在 api 单副本下安全；多副本须改用独立一次性迁移任务（见 docs/设计文档.md §8）。
 CMD ["sh", "-lc", "pnpm prisma:deploy && node dist/main.js"]

@@ -32,7 +32,10 @@ onMounted(() => {
   } catch { /* 忽略损坏草稿 */ }
   window.addEventListener('beforeunload', onBeforeUnload);
 });
-onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload));
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', onBeforeUnload);
+  clearTimeout(saveTimer); // 防卸载后防抖定时器把内容回写
+});
 
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 watch([body, theme], () => {
@@ -57,6 +60,7 @@ async function send() {
   error.value = '';
   try {
     await api.post('/letters/compose', { body: body.value, theme: theme.value });
+    clearTimeout(saveTimer); // 防「寄出后防抖定时器再把草稿写回」
     try { localStorage.removeItem(DRAFT_KEY); } catch { /* noop */ }
     await quota.load();
     await navigateTo('/letters');
