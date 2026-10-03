@@ -6,8 +6,6 @@ const auth = useAuthStore();
 const toast = useToast();
 
 const invisible = ref(false);
-const guardianMode = ref(false);
-const isMinor = computed(() => auth.me?.ageTier === 'TEEN');
 const loading = ref(!auth.me);
 const saving = ref(false);
 
@@ -22,13 +20,12 @@ onMounted(async () => {
     }
   }
   invisible.value = auth.me?.invisible ?? false;
-  guardianMode.value = auth.me?.guardianMode ?? false;
 });
 
 async function save() {
   saving.value = true;
   try {
-    const me = await api.patch('/me/settings', { invisible: invisible.value, guardianMode: guardianMode.value });
+    const me = await api.patch('/me/settings', { invisible: invisible.value });
     auth.setMe(me);
     toast.success('已保存');
   } catch (e: any) {
@@ -87,14 +84,6 @@ function logout() {
             <span class="block text-xs text-inkFaint">闭关时，你的信暂不漂入漂流海</span>
           </span>
           <input v-model="invisible" type="checkbox" class="w-5 h-5 accent-terra" />
-        </label>
-
-        <label class="flex items-center justify-between">
-          <span>
-            <span class="font-600">守护模式</span>
-            <span class="block text-xs text-inkFaint">{{ isMinor ? '未成年用户不可关闭' : '更严格的内容与互动保护' }}</span>
-          </span>
-          <input v-model="guardianMode" type="checkbox" :disabled="isMinor" class="w-5 h-5 accent-terra disabled:opacity-50" />
         </label>
 
         <button class="btn-primary w-full" :disabled="saving" @click="save">{{ saving ? '保存中…' : '保存设置' }}</button>

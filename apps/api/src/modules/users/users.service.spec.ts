@@ -8,7 +8,6 @@ function makeService() {
     userProfile: { updateMany: vi.fn(async () => ({ count: 1 })) },
     letter: { updateMany: vi.fn(async () => ({ count: 1 })) },
     penPalRelation: { updateMany: vi.fn(async () => ({ count: 1 })) },
-    parentalConsent: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     notification: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     block: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     dataDeletionRequest: { update: vi.fn(async () => ({})) },

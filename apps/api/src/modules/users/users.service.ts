@@ -1,5 +1,5 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { AgeTier, DeletionStatus, LetterStatus, RelationStatus, UserStatus } from '@prisma/client';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { DeletionStatus, LetterStatus, RelationStatus, UserStatus } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -23,8 +23,6 @@ export class UsersService {
       mbti: p?.mbti ?? 'UNKNOWN',
       interestTags: Array.isArray(p?.interestTags) ? p!.interestTags : [],
       oneLiner: p?.oneLiner ?? undefined,
-      ageTier: user.ageTier,
-      guardianMode: p?.guardianMode ?? false,
       invisible: p?.invisible ?? false,
       matchPreference: p?.matchPreference ?? 0.5,
       hasRegion: !!p?.geohash5,
@@ -73,18 +71,11 @@ export class UsersService {
   }
 
   async updateSettings(userId: string, dto: UpdateSettingsDto) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException({ code: 'USER_NOT_FOUND', message: '用户不存在' });
+    const exists = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!exists) throw new NotFoundException({ code: 'USER_NOT_FOUND', message: '用户不存在' });
 
     const data: Record<string, unknown> = {};
     if (dto.invisible !== undefined) data.invisible = dto.invisible;
-    if (dto.guardianMode !== undefined) {
-      // 未成年人不可关闭守护模式
-      if (user.ageTier === AgeTier.TEEN && dto.guardianMode === false) {
-        throw new ForbiddenException({ code: 'GUARDIAN_LOCKED', message: '未成年用户的守护模式不可关闭' });
-      }
-      data.guardianMode = dto.guardianMode;
-    }
     await this.prisma.userProfile.update({ where: { userId }, data });
     return this.getMe(userId);
   }
@@ -93,7 +84,7 @@ export class UsersService {
   async exportData(userId: string) {
     const [user, letters, relations, unseals, fishings, reportsMade, penalties, blocks, appeals, deletionReqs, notifications, dailyQuotas] =
       await Promise.all([
-        this.prisma.user.findUnique({ where: { id: userId }, include: { profile: true, parentalConsent: true } }),
+        this.prisma.user.findUnique({ where: { id: userId }, include: { profile: true } }),
         this.prisma.letter.findMany({ where: { authorId: userId }, orderBy: { createdAt: 'asc' } }),
         this.prisma.penPalRelation.findMany({
           where: { OR: [{ userAId: userId }, { userBId: userId }] },
@@ -117,11 +108,9 @@ export class UsersService {
         email: user?.email,
         phone: user?.phone,
         status: user?.status,
-        ageTier: user?.ageTier,
         createdAt: user?.createdAt?.toISOString(),
       },
       profile: user?.profile,
-      parentalConsent: user?.parentalConsent ?? null,
       letters: letters.map((l) => ({
         publicId: l.publicId,
         body: l.body,
@@ -193,7 +182,7 @@ export class UsersService {
    *  ① 抹除账号标识（email/phone/密码随机化）并置 DELETED（禁止登录）；
    *  ② 抹除名片 PII（笔名/一句话/兴趣/粗粒度区域），他人视角降级为「已注销的旅人」；
    *  ③ 停止其漂流中的信（在途/在池/被预览/待回信 → 归档；已结缘 PAIRED 保留）；
-   *  ④ 封存笔友关系、清通知/监护人同意/双向拉黑，登记请求置 DONE。
+   *  ④ 封存笔友关系、清通知/双向拉黑，登记请求置 DONE。
    * 信件与笔友往来正文保留（收件方权益），但已与可识别身份解绑。
    */
   async processDeletionRequests(): Promise<number> {
@@ -238,7 +227,6 @@ export class UsersService {
             where: { OR: [{ userAId: req.userId }, { userBId: req.userId }], status: RelationStatus.ACTIVE },
             data: { status: RelationStatus.ARCHIVED },
           });
-          await tx.parentalConsent.deleteMany({ where: { userId: req.userId } });
           await tx.notification.deleteMany({ where: { userId: req.userId } });
           await tx.block.deleteMany({ where: { OR: [{ userId: req.userId }, { targetUserId: req.userId }] } });
           await tx.dataDeletionRequest.update({

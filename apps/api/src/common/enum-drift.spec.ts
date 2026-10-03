@@ -8,7 +8,6 @@ import * as Shared from '@inkling/shared';
  */
 const MIRRORED = [
   'LetterStatus',
-  'AgeTier',
   'RiskLevel',
   'ReviewAction',
   'PenaltyType',

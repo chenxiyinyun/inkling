@@ -8,7 +8,7 @@ export function uniqueSuffix(): string {
   return `${(seq += 1)}`;
 }
 
-/** 直接建一个带 profile 的成年用户（绕过 HTTP，集成测试更快）。 */
+/** 直接建一个带 profile 的用户（绕过 HTTP，集成测试更快）。 */
 export async function createUser(
   app: INestApplication,
   opts: { penName?: string; mbti?: string; invisible?: boolean; geohash5?: string | null } = {},
@@ -18,7 +18,6 @@ export async function createUser(
   return prisma.user.create({
     data: {
       passwordHash: 'x',
-      ageTier: 'ADULT',
       email: `factory-${n}@e2e.dev`,
       profile: {
         create: {

@@ -20,7 +20,6 @@ const TABLES = [
   'fishing_records',
   'preview_snapshots',
   'letters',
-  'parental_consents',
   'user_profiles',
   'users',
 ];

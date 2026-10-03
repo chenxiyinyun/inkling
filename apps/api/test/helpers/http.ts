@@ -12,10 +12,10 @@ export function http(app: INestApplication) {
   return request(app.getHttpServer());
 }
 
-/** 注册一个成年用户，返回 token / refreshToken / publicId / email。 */
-export async function registerAdult(
+/** 注册一个用户，返回 token / refreshToken / publicId / email。 */
+export async function registerUser(
   app: INestApplication,
-  over: { penName?: string; birthDate?: string } = {},
+  over: { penName?: string } = {},
 ): Promise<{ token: string; refreshToken: string; publicId: string; email: string }> {
   const n = uniqueSuffix();
   const email = `e2e-${n}@e2e.dev`;
@@ -24,7 +24,6 @@ export async function registerAdult(
     .send({
       email,
       password: 'password123',
-      birthDate: over.birthDate ?? '1990-01-01',
       penName: over.penName ?? `Tester${n}`,
     })
     .expect(201);

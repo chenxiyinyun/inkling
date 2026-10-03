@@ -3,7 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import { LetterStatus, PenaltyType, UserStatus } from '@prisma/client';
 import { createTestApp } from '../helpers/app';
 import { resetDb } from '../helpers/db';
-import { http, registerAdult, CLEAN_LETTER } from '../helpers/http';
+import { http, registerUser, CLEAN_LETTER } from '../helpers/http';
 import { PrismaService } from '../../src/common/prisma/prisma.service';
 import { UsersService } from '../../src/modules/users/users.service';
 
@@ -27,7 +27,7 @@ describe('风控闭环 + GDPR e2e（真实 PG）', () => {
   });
 
   it('内容命中 BLOCK → CONTENT_BLOCKED，并自动记一条 WARNING 处罚', async () => {
-    const u = await registerAdult(app);
+    const u = await registerUser(app);
     const res = await http(app)
       .post('/v1/letters/compose')
       .set('Authorization', `Bearer ${u.token}`)
@@ -41,7 +41,7 @@ describe('风控闭环 + GDPR e2e（真实 PG）', () => {
   });
 
   it('累计 3 次 BLOCK → 自动冻结，且登录被拦 (ACCOUNT_FROZEN)', async () => {
-    const u = await registerAdult(app);
+    const u = await registerUser(app);
     for (let i = 0; i < 3; i++) {
       await http(app).post('/v1/letters/compose').set('Authorization', `Bearer ${u.token}`).send({ body: BLOCK_LETTER }).expect(400);
     }
@@ -54,7 +54,7 @@ describe('风控闭环 + GDPR e2e（真实 PG）', () => {
   });
 
   it('冻结到期 → 登录自动解冻放行', async () => {
-    const u = await registerAdult(app);
+    const u = await registerUser(app);
     const dbUser = await prisma.user.findUnique({ where: { publicId: u.publicId } });
     await prisma.user.update({
       where: { id: dbUser!.id },
@@ -68,9 +68,9 @@ describe('风控闭环 + GDPR e2e（真实 PG）', () => {
   });
 
   it('举报累积达阈值 → 被举报者自动冻结', async () => {
-    const target = await registerAdult(app);
+    const target = await registerUser(app);
     for (let i = 0; i < 3; i++) {
-      const reporter = await registerAdult(app);
+      const reporter = await registerUser(app);
       await http(app)
         .post('/v1/reports')
         .set('Authorization', `Bearer ${reporter.token}`)
@@ -82,7 +82,7 @@ describe('风控闭环 + GDPR e2e（真实 PG）', () => {
   });
 
   it('申诉落表：POST /appeals 持久化并返回 appealId/OPEN', async () => {
-    const u = await registerAdult(app);
+    const u = await registerUser(app);
     const res = await http(app)
       .post('/v1/appeals')
       .set('Authorization', `Bearer ${u.token}`)
@@ -98,7 +98,7 @@ describe('风控闭环 + GDPR e2e（真实 PG）', () => {
   });
 
   it('GDPR 全量导出：含信件正文与账号结构化数据', async () => {
-    const u = await registerAdult(app, { penName: '导出测试' });
+    const u = await registerUser(app, { penName: '导出测试' });
     await http(app).post('/v1/letters/compose').set('Authorization', `Bearer ${u.token}`).send({ body: CLEAN_LETTER }).expect(201);
 
     const res = await http(app).post('/v1/me/export').set('Authorization', `Bearer ${u.token}`).expect(201);
@@ -111,7 +111,7 @@ describe('风控闭环 + GDPR e2e（真实 PG）', () => {
   });
 
   it('存量 access token 对「已冻结」账号立即失效（403 ACCOUNT_FROZEN，无需等 token 过期）', async () => {
-    const u = await registerAdult(app);
+    const u = await registerUser(app);
     await http(app).get('/v1/me').set('Authorization', `Bearer ${u.token}`).expect(200);
 
     const dbUser = await prisma.user.findUnique({ where: { publicId: u.publicId } });
@@ -125,7 +125,7 @@ describe('风控闭环 + GDPR e2e（真实 PG）', () => {
   });
 
   it('被冻结账号的 refresh token 也无法续签（403 ACCOUNT_FROZEN）', async () => {
-    const u = await registerAdult(app);
+    const u = await registerUser(app);
     const dbUser = await prisma.user.findUnique({ where: { publicId: u.publicId } });
     await prisma.user.update({
       where: { id: dbUser!.id },
@@ -137,7 +137,7 @@ describe('风控闭环 + GDPR e2e（真实 PG）', () => {
   });
 
   it('GDPR 注销执行器：匿名化 + DELETED + 漂流信归档，重复登记幂等', async () => {
-    const u = await registerAdult(app);
+    const u = await registerUser(app);
     await http(app).post('/v1/letters/compose').set('Authorization', `Bearer ${u.token}`).send({ body: CLEAN_LETTER }).expect(201);
     await http(app).delete('/v1/me').set('Authorization', `Bearer ${u.token}`).expect(200);
     // 幂等：再次请求不新增登记行

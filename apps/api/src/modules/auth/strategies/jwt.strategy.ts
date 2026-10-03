@@ -9,7 +9,6 @@ import type { AuthUser } from '../../../common/decorators/current-user.decorator
 interface JwtPayload {
   sub: string;
   publicId: string;
-  ageTier: string;
   status: string;
 }
 
@@ -34,7 +33,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: JwtPayload): Promise<AuthUser> {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, publicId: true, ageTier: true, status: true, frozenUntil: true },
+      select: { id: true, publicId: true, status: true, frozenUntil: true },
     });
     if (!user) throw new UnauthorizedException({ code: 'INVALID_TOKEN', message: '请重新登录' });
 
@@ -53,6 +52,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       status = UserStatus.ACTIVE;
     }
 
-    return { userId: user.id, publicId: user.publicId, ageTier: user.ageTier, status };
+    return { userId: user.id, publicId: user.publicId, status };
   }
 }

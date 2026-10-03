@@ -3,7 +3,7 @@
  * 有状态：配额随操作递减、打捞→预览→拆封→回信→笔友 全链路可走通。
  * 持久化到 sessionStorage（按标签页），刷新不丢档；换标签页/关闭即清。
  */
-import { AgeTier, LetterStatus, NotificationType, RelationStatus, QUOTA_DEFAULTS } from '@inkling/shared';
+import { LetterStatus, NotificationType, RelationStatus, QUOTA_DEFAULTS } from '@inkling/shared';
 import type { MeProfile, MyLetter, PublicProfile } from '@inkling/shared';
 
 const STORAGE_KEY = 'inkling_mock_db_v1';
@@ -81,8 +81,6 @@ function seed(): MockState {
     interestTags: ['阅读', '旅行', '咖啡'],
     oneLiner: '在路上，也在找同路人',
     region: '远方',
-    ageTier: AgeTier.ADULT,
-    guardianMode: false,
     invisible: false,
     matchPreference: 0.5,
   };

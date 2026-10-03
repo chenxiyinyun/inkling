@@ -24,10 +24,6 @@ export const LETTER_MAX_CHARS = 1000;
 /** 打捞预览露出的正文字数 */
 export const PREVIEW_BODY_CHARS = 60;
 
-/** 年龄门控（各地法定最低见 docs/设计文档.md） */
-export const MIN_AGE_HARD_FLOOR = 13;
-export const GUARDIAN_MODE_BELOW_AGE = 18;
-
 /**
  * 真实地理距离 → 递送工具与基准时长（小时）。
  * MVP 用粗档；生产期按 docs/设计文档.md 公式精算。

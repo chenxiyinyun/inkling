@@ -21,13 +21,6 @@ export enum LetterStatus {
   FROZEN = 'FROZEN', // 预留：违规冻结（MVP 不写入）
 }
 
-/** 年龄分级（未成年人保护，详见 docs/设计文档.md） */
-export enum AgeTier {
-  CHILD = 'CHILD', // 低于法定最低年龄 → 婉拒
-  TEEN = 'TEEN', // 13–17，进入守护模式
-  ADULT = 'ADULT', // 18+
-}
-
 /** 内容审核风险等级 */
 export enum RiskLevel {
   SAFE = 'SAFE',

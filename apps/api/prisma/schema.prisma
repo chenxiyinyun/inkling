@@ -21,12 +21,6 @@ enum UserStatus {
   DELETED // GDPR 注销：已匿名化，禁止登录（由删除请求执行器写入，见 UsersService.processDeletionRequests）
 }
 
-enum AgeTier {
-  CHILD
-  TEEN
-  ADULT
-}
-
 // 注：REVIEWING/RECYCLED/DIMMED/FROZEN 为「预留态」——对应路线图功能（审核队列/回池/降权/封禁），
 // MVP 暂无代码写入它们（回池用 FLOATING + recycleCount 表达）。保留以免日后再做破坏性枚举重建。
 // 与 packages/shared/src/enums.ts 的成员集合由 enum-drift.spec.ts 断言一致。
@@ -101,12 +95,6 @@ enum ReportReason {
   OTHER
 }
 
-enum ConsentStatus {
-  PENDING
-  GRANTED
-  REJECTED
-}
-
 enum DeletionStatus {
   PENDING
   PROCESSING
@@ -137,15 +125,12 @@ model User {
   phone        String?    @unique
   passwordHash String
   status       UserStatus @default(ACTIVE)
-  ageTier      AgeTier
-  birthDate    DateTime? // 仅用于年龄保护，最小化存储
   frozenUntil  DateTime?
   lastActiveAt DateTime   @default(now())
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
   profile         UserProfile?
-  parentalConsent ParentalConsent?
   letters         Letter[]         @relation("LetterAuthor")
   fishings        FishingRecord[]
   unseals         UnsealRecord[]
@@ -173,7 +158,6 @@ model UserProfile {
   oneLiner        String?  @db.VarChar(60)
   geohash5        String? // 仅粗粒度区域（±2.4km），不存精确经纬度
   matchPreference Float    @default(0.5) // 0=最相似 1=最不一样
-  guardianMode    Boolean  @default(false)
   invisible       Boolean  @default(false) // 闭关 / 隐身
   reputation      Float    @default(0.5)
   updatedAt       DateTime @updatedAt
@@ -181,20 +165,6 @@ model UserProfile {
   @@index([geohash5])
   @@index([mbti])
   @@map("user_profiles")
-}
-
-model ParentalConsent {
-  id             String        @id @default(cuid())
-  userId         String        @unique
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  method         String // 自声明 / 信用卡 / 第三方年龄验证
-  guardianContact String?
-  jurisdiction   String? // GDPR-K / COPPA / PDPO / 個資法
-  status         ConsentStatus @default(PENDING)
-  grantedAt      DateTime?
-  createdAt      DateTime      @default(now())
-
-  @@map("parental_consents")
 }
 
 // ───────────────── 信件与漂流 ─────────────────

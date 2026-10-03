@@ -7,8 +7,6 @@ export interface AppConfig {
   replyWindowDays: number;
   letterMaxDriftDays: number;
   letterMaxRecycle: number;
-  minAgeHardFloor: number;
-  guardianModeBelowAge: number;
   /** 内容审核 Provider：local（默认本地规则）/ remote（第三方 API，C 档）。 */
   moderation: { provider: string; remoteApiUrl?: string; remoteApiKey?: string };
   /** 投递后入池前的固定延时（秒）。信件入海无收件人、距离未知，故用短延时演示"漂入海面"。 */
@@ -60,8 +58,6 @@ export default (): AppConfig => ({
   replyWindowDays: num(process.env.REPLY_WINDOW_DAYS, 7),
   letterMaxDriftDays: num(process.env.LETTER_MAX_DRIFT_DAYS, 30),
   letterMaxRecycle: num(process.env.LETTER_MAX_RECYCLE, 3),
-  minAgeHardFloor: num(process.env.MIN_AGE_HARD_FLOOR, 13),
-  guardianModeBelowAge: num(process.env.GUARDIAN_MODE_BELOW_AGE, 18),
   moderation: {
     provider: process.env.MODERATION_PROVIDER ?? 'local',
     remoteApiUrl: process.env.MODERATION_API_URL,

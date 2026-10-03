@@ -1,4 +1,4 @@
-import { PrismaClient, AgeTier, LetterStatus } from '@prisma/client';
+import { PrismaClient, LetterStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -45,8 +45,6 @@ async function main() {
       create: {
         email: s.email,
         passwordHash,
-        ageTier: AgeTier.ADULT,
-        birthDate: new Date('1998-01-01'),
         profile: {
           create: {
             penName: s.penName,

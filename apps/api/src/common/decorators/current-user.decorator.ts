@@ -3,7 +3,6 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 export interface AuthUser {
   userId: string;
   publicId: string;
-  ageTier: string;
   status: string;
 }
 

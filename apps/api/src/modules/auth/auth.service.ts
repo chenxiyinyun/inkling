@@ -1,10 +1,9 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { ConsentStatus, User, UserStatus } from '@prisma/client';
+import { User, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { deriveAgeDecision } from './age.util';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -21,18 +20,6 @@ export class AuthService {
       throw new BadRequestException({ code: 'IDENTIFIER_REQUIRED', message: '请提供邮箱或手机号' });
     }
 
-    const hardFloor = this.config.get<number>('minAgeHardFloor') ?? 13;
-    const guardianBelow = this.config.get<number>('guardianModeBelowAge') ?? 18;
-    const { tier: ageTier, isMinor, belowFloor } = deriveAgeDecision(new Date(dto.birthDate), hardFloor, guardianBelow);
-
-    // 年龄硬门控（未成年人保护，详见 docs/设计文档.md）
-    if (belowFloor) {
-      throw new ForbiddenException({
-        code: 'AGE_BELOW_FLOOR',
-        message: '漂流邮局暂时不能为你开启航行。待你长大些，海面会一直在。',
-      });
-    }
-
     // 唯一性校验
     const existing = await this.prisma.user.findFirst({
       where: { OR: [dto.email ? { email: dto.email } : undefined, dto.phone ? { phone: dto.phone } : undefined].filter(Boolean) as any },
@@ -46,25 +33,15 @@ export class AuthService {
         email: dto.email,
         phone: dto.phone,
         passwordHash,
-        ageTier,
-        birthDate: new Date(dto.birthDate),
         profile: {
           create: {
             penName: dto.penName,
-            guardianMode: isMinor, // 未成年默认开启守护模式
           },
         },
-        ...(isMinor
-          ? {
-              parentalConsent: {
-                create: { method: 'self-declared', status: ConsentStatus.PENDING },
-              },
-            }
-          : {}),
       },
     });
 
-    return { ...this.issueTokens(user), ageTier, guardianMode: isMinor };
+    return this.issueTokens(user);
   }
 
   async login(dto: LoginDto) {
@@ -99,7 +76,7 @@ export class AuthService {
   }
 
   private issueTokens(user: User) {
-    const payload = { sub: user.id, publicId: user.publicId, ageTier: user.ageTier, status: user.status };
+    const payload = { sub: user.id, publicId: user.publicId, status: user.status };
     const accessToken = this.jwt.sign(payload, { expiresIn: this.config.get<string>('jwt.accessTtl') ?? '15m' });
     const refreshToken = this.jwt.sign({ sub: user.id, type: 'refresh' }, { expiresIn: this.config.get<string>('jwt.refreshTtl') ?? '30d' });
     return { accessToken, refreshToken, publicId: user.publicId };

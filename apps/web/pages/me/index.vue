@@ -19,7 +19,6 @@ onMounted(async () => {
   }
 });
 
-const ageTierLabel: Record<string, string> = { ADULT: '成年', TEEN: '未成年（守护中）', CHILD: '受限' };
 </script>
 
 <template>
@@ -35,13 +34,12 @@ const ageTierLabel: Record<string, string> = { ADULT: '成年', TEEN: '未成年
         <span v-for="t in auth.me.interestTags" :key="t" class="chip bg-paperEdge text-inkSoft">{{ t }}</span>
       </div>
       <p v-if="auth.me.oneLiner" class="mt-3 text-sm italic text-inkSoft">「{{ auth.me.oneLiner }}」</p>
-      <div class="mt-4 text-xs text-inkFaint">账号状态：{{ ageTierLabel[auth.me.ageTier] ?? auth.me.ageTier }}</div>
     </div>
 
     <div class="mt-5 space-y-2">
       <NuxtLink to="/me/notifications" class="card block">通知中心 ›</NuxtLink>
       <NuxtLink to="/onboarding/profile?edit=1" class="card block">编辑文字名片 ›</NuxtLink>
-      <NuxtLink to="/me/settings" class="card block">设置（守护模式 · 闭关 · 隐私）›</NuxtLink>
+      <NuxtLink to="/me/settings" class="card block">设置（闭关 · 隐私）›</NuxtLink>
     </div>
   </div>
 </template>

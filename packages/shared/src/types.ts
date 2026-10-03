@@ -1,4 +1,4 @@
-import type { AgeTier, LetterStatus, NotificationType, RelationStatus } from './enums';
+import type { LetterStatus, NotificationType, RelationStatus } from './enums';
 import type { MbtiValue } from './mbti';
 
 /** 统一 API 响应结构 */
@@ -20,8 +20,6 @@ export interface PublicProfile {
 
 /** 当前登录用户（含敏感于自己的字段） */
 export interface MeProfile extends PublicProfile {
-  ageTier: AgeTier;
-  guardianMode: boolean;
   invisible: boolean;
   matchPreference: number; // 0..1
 }

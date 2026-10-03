@@ -4,7 +4,7 @@ import { LetterStatus, NotificationType } from '@prisma/client';
 import { createTestApp } from '../helpers/app';
 import { resetDb } from '../helpers/db';
 import { createLetter, createUser } from '../helpers/factory';
-import { http, registerAdult } from '../helpers/http';
+import { http, registerUser } from '../helpers/http';
 import { PrismaService } from '../../src/common/prisma/prisma.service';
 import { DeliveryScheduler } from '../../src/modules/delivery/delivery.scheduler';
 
@@ -87,7 +87,7 @@ describe('通知 e2e（真实 PG）', () => {
   it('打捞 → 通知作者 LETTER_FISHED（去人格化，不含打捞者）', async () => {
     const author = await createUser(app, {});
     const letter = await createLetter(app, author.id, { withSnapshot: true });
-    const reader = await registerAdult(app);
+    const reader = await registerUser(app);
     await http(app).post('/v1/ocean/fish').set('Authorization', `Bearer ${reader.token}`).expect(201);
     const notes = await prisma.notification.findMany({ where: { userId: author.id, type: NotificationType.LETTER_FISHED } });
     expect(notes.length).toBe(1);
@@ -97,7 +97,7 @@ describe('通知 e2e（真实 PG）', () => {
   });
 
   it('HTTP：列表 / 未读数 / 标记全部已读', async () => {
-    const u = await registerAdult(app);
+    const u = await registerUser(app);
     const dbUser = await prisma.user.findUnique({ where: { publicId: u.publicId } });
     await prisma.notification.createMany({
       data: [

@@ -1,4 +1,4 @@
-import { IsDateString, IsEmail, IsOptional, IsString, MinLength, MaxLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, MinLength, MaxLength } from 'class-validator';
 
 export class RegisterDto {
   @IsOptional()
@@ -13,10 +13,6 @@ export class RegisterDto {
   @MinLength(8, { message: '密码至少 8 位' })
   @MaxLength(72)
   password!: string;
-
-  /** 出生日期（仅用于年龄保护）。ISO: YYYY-MM-DD */
-  @IsDateString()
-  birthDate!: string;
 
   @IsString()
   @MinLength(1)

@@ -6,7 +6,7 @@ const api = useApi();
 const auth = useAuthStore();
 
 const mode = ref<'login' | 'register'>('login');
-const form = reactive({ email: '', password: '', penName: '', birthDate: '' });
+const form = reactive({ email: '', password: '', penName: '' });
 const loading = ref(false);
 const error = ref('');
 
@@ -19,7 +19,6 @@ async function submit() {
         email: form.email,
         password: form.password,
         penName: form.penName,
-        birthDate: form.birthDate,
       });
       auth.setTokens(res.accessToken, res.refreshToken);
       auth.setMe(await api.get('/me'));
@@ -57,8 +56,6 @@ async function submit() {
         <input v-model="form.password" class="input" type="password" placeholder="密码（至少 8 位）" autocomplete="current-password" />
         <template v-if="mode === 'register'">
           <input v-model="form.penName" class="input" type="text" placeholder="笔名" />
-          <label class="block text-xs text-inkSoft">出生日期（仅用于年龄保护）</label>
-          <input v-model="form.birthDate" class="input" type="date" />
         </template>
       </div>
 

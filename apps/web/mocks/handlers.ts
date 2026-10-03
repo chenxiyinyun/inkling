@@ -2,7 +2,7 @@
  * 假后端路由表（见 db.ts）。每条 handler 返回的就是 useApi 解包后的 data；
  * 失败抛 MockError，由 dispatch 包成 ofetch 风格错误（带 response.status 与 data.error）。
  */
-import { AgeTier, LetterStatus, RelationStatus, timeBand } from '@inkling/shared';
+import { LetterStatus, RelationStatus, timeBand } from '@inkling/shared';
 import type { LetterPreview, MeProfile, MyLetter, NotificationItem, PenPalSummary, PublicProfile, QuotaToday } from '@inkling/shared';
 import { db, save, nextId, resetsAtUtc, findProfile, type PoolLetter, type StoredNotification } from './db';
 
@@ -73,24 +73,14 @@ const routes: Route[] = [
     pattern: /^\/auth\/register$/,
     run: ({ body }) => {
       const s = db();
-      // 对齐真实后端 RegisterDto（email + password≥8 + penName + birthDate）与年龄硬门控
+      // 对齐真实后端 RegisterDto（email + password≥8 + penName）
       const email = String(body?.email ?? '');
       const password = String(body?.password ?? '');
       const penName = String(body?.penName ?? '').trim();
-      const birthDate = String(body?.birthDate ?? '');
       if (!email || !/^\S+@\S+\.\S+$/.test(email)) throw new MockError(400, 'VALIDATION_FAILED', '请填写有效的邮箱');
       if (password.length < 8) throw new MockError(400, 'VALIDATION_FAILED', '密码至少 8 位');
       if (!penName) throw new MockError(400, 'VALIDATION_FAILED', '请填写笔名');
-      const birth = new Date(birthDate);
-      if (!birthDate || Number.isNaN(birth.getTime())) throw new MockError(400, 'VALIDATION_FAILED', '请填写出生日期');
-      const now = new Date();
-      let age = now.getFullYear() - birth.getFullYear();
-      const m = now.getMonth() - birth.getMonth();
-      if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
-      if (age < 13) throw new MockError(403, 'AGE_BELOW_FLOOR', '漂流邮局暂时不能为你开启航行。待你长大些，海面会一直在。');
       s.me.penName = penName;
-      s.me.ageTier = age < 18 ? AgeTier.TEEN : AgeTier.ADULT;
-      s.me.guardianMode = age < 18;
       s.me.mbti = 'UNKNOWN';
       s.me.interestTags = [];
       s.me.oneLiner = undefined;
@@ -126,8 +116,6 @@ const routes: Route[] = [
     run: ({ body }) => {
       const s = db();
       if (typeof body?.invisible === 'boolean') s.me.invisible = body.invisible;
-      // 未成年（TEEN）不可关闭守护模式
-      if (typeof body?.guardianMode === 'boolean') s.me.guardianMode = s.me.ageTier === 'TEEN' ? true : body.guardianMode;
       save();
       return s.me;
     },
