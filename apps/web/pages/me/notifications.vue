@@ -24,12 +24,20 @@ function linkOf(n: NotificationItem): string | undefined {
   }
   return undefined;
 }
+
+/** 点开任意一条：先标记该条已读（有落点的照常跳转）。 */
+function open(n: NotificationItem) {
+  if (!n.read) void markRead([n.publicId]);
+}
 </script>
 
 <template>
   <div class="pt-4">
     <div class="flex items-center justify-between">
-      <h1 class="font-serif text-2xl font-700">通知</h1>
+      <div class="flex items-center gap-2">
+        <NuxtLink to="/me" class="text-inkFaint" aria-label="返回我的">‹</NuxtLink>
+        <h1 class="font-serif text-2xl font-700">通知</h1>
+      </div>
       <button v-if="unread > 0" class="text-xs text-sea" @click="markRead()">全部已读</button>
     </div>
 
@@ -49,6 +57,7 @@ function linkOf(n: NotificationItem): string | undefined {
           :to="linkOf(n)"
           class="card flex items-start gap-3"
           :class="{ 'opacity-60': n.read }"
+          @click="open(n)"
         >
           <span class="text-xl leading-none">{{ typeIcon[n.type] ?? '🔔' }}</span>
           <div class="flex-1 min-w-0">

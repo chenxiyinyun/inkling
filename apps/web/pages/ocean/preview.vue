@@ -19,7 +19,7 @@ async function release() {
   busy.value = true;
   try {
     await api.post(`/fishing/${ocean.preview.fishingId}/release`);
-    ocean.clear();
+    ocean.setPreview(null); // 只清本次预览，避免误伤已拆封的信
     await navigateTo('/ocean');
   } catch (e: any) {
     error.value = e.message;
@@ -39,6 +39,7 @@ async function unseal() {
       api.post<UnsealedLetter>(`/fishing/${ocean.preview.fishingId}/unseal`),
       new Promise((r) => setTimeout(r, 950)),
     ]);
+    ocean.setPreview(null);
     ocean.setUnsealed(full);
     await quota.load();
     await navigateTo('/ocean/read');
@@ -54,6 +55,10 @@ async function unseal() {
 <template>
   <div v-if="ocean.preview" class="pt-6">
     <UnsealCeremony v-if="unsealing" />
+    <div class="mb-3 flex items-center gap-2">
+      <NuxtLink to="/ocean" class="text-inkFaint" aria-label="返回漂流海">‹</NuxtLink>
+      <span class="text-xs text-inkFaint">先回海面看看 —— 预览锁内随时可以回来做决定</span>
+    </div>
     <LetterCard :preview="ocean.preview" />
 
     <p v-if="error" class="mt-3 text-sm text-terra">{{ error }}</p>

@@ -18,7 +18,10 @@ const deadlineText = computed(() => {
 <template>
   <div v-if="ocean.unsealed" class="pt-6 pb-10">
     <div class="flex items-center justify-between">
-      <div class="font-serif text-lg font-700">{{ ocean.unsealed.author.penName }}</div>
+      <div class="flex items-center gap-2">
+        <NuxtLink to="/ocean" class="text-inkFaint" aria-label="返回漂流海">‹</NuxtLink>
+        <div class="font-serif text-lg font-700">{{ ocean.unsealed.author.penName }}</div>
+      </div>
       <NuxtLink :to="`/profiles/${ocean.unsealed.author.publicId}`" class="text-xs text-inkFaint">查看名片</NuxtLink>
     </div>
     <div class="mt-1 flex flex-wrap gap-1.5">

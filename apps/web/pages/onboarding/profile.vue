@@ -5,6 +5,10 @@ definePageMeta({ layout: 'blank' });
 
 const api = useApi();
 const auth = useAuthStore();
+const route = useRoute();
+const toast = useToast();
+/** 从「我的 → 编辑文字名片」进入时带 ?edit=1：显示返回并可回跳 /me。 */
+const isEdit = computed(() => route.query.edit === '1');
 
 const PRESET_TAGS = ['阅读', '音乐', '旅行', '电影', '手作', '运动', '美食', '摄影', '写作', '哲学', '猫', '狗', '游戏', '茶', '咖啡', '诗', '独处', '徒步'];
 
@@ -55,7 +59,12 @@ async function save() {
       lng: form.lng,
     });
     auth.setMe(me);
-    await navigateTo('/ocean');
+    if (isEdit.value) {
+      toast.success('名片已更新');
+      await navigateTo('/me');
+    } else {
+      await navigateTo('/ocean');
+    }
   } catch (e: any) {
     error.value = e.message;
   } finally {
@@ -66,7 +75,8 @@ async function save() {
 
 <template>
   <div class="pt-6 pb-16">
-    <h1 class="font-serif text-2xl font-700">你的文字名片</h1>
+    <NuxtLink v-if="isEdit" to="/me" class="text-inkFaint" aria-label="返回">‹ 返回</NuxtLink>
+    <h1 class="font-serif text-2xl font-700" :class="{ 'mt-2': isEdit }">你的文字名片</h1>
     <p class="mt-1 text-sm text-inkSoft">这是别人打捞到你时最先看到的样子（不含照片）。</p>
 
     <div class="space-y-6 mt-6">
@@ -127,7 +137,7 @@ async function save() {
       </div>
 
       <p v-if="error" class="text-sm text-terra">{{ error }}</p>
-      <button class="btn-primary w-full" :disabled="saving" @click="save">{{ saving ? '保存中…' : '进入漂流海' }}</button>
+      <button class="btn-primary w-full" :disabled="saving" @click="save">{{ saving ? '保存中…' : isEdit ? '保存名片' : '进入漂流海' }}</button>
     </div>
   </div>
 </template>

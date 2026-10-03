@@ -34,7 +34,10 @@ async function send() {
 
 <template>
   <div v-if="ocean.unsealed" class="pt-6">
-    <h1 class="font-serif text-xl font-700">回信给 {{ ocean.unsealed.author.penName }}</h1>
+    <div class="flex items-center gap-2">
+      <NuxtLink to="/ocean/read" class="text-inkFaint" aria-label="返回读信">‹</NuxtLink>
+      <h1 class="font-serif text-xl font-700">回信给 {{ ocean.unsealed.author.penName }}</h1>
+    </div>
     <textarea v-model="body" rows="12" maxlength="1000" class="letter-paper w-full rounded-2xl p-4 mt-4 outline-none border border-paperEdge" placeholder="亲爱的陌生人，读了你的信，我想说……" />
     <div class="mt-1 text-right text-[11px] text-inkFaint">{{ body.length }}/1000</div>
     <p v-if="error" class="text-sm text-terra">{{ error }}</p>

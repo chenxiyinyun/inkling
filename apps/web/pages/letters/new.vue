@@ -75,7 +75,10 @@ async function send() {
 <template>
   <div class="pt-4 pb-10">
     <div class="flex items-center justify-between">
-      <h1 class="font-serif text-xl font-700">投递漂流瓶</h1>
+      <div class="flex items-center gap-2">
+        <NuxtLink to="/letters" class="text-inkFaint" aria-label="返回我的信件">‹</NuxtLink>
+        <h1 class="font-serif text-xl font-700">投递漂流瓶</h1>
+      </div>
       <span class="text-xs text-inkFaint">今日投递 {{ quota.send }}</span>
     </div>
 
