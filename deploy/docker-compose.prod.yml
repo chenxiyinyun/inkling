@@ -30,6 +30,8 @@ services:
       api:
         condition: service_healthy
     logging: *default-logging
+    mem_limit: 192m
+    cpus: 0.5
 
   api:
     build:
@@ -38,9 +40,11 @@ services:
     image: inkling-api:latest
     restart: unless-stopped
     env_file:
-      - ../.env # 相对本 compose 文件 = 仓库根目录 .env（注入 DATABASE_URL/REDIS_URL/JWT_SECRET 等）
+      - ../.env # 只放密钥与业务参数（JWT_SECRET/DELIVERY_HOURS_SCALE 等）；连接串由下方 environment 生成，无需手改 host
     environment:
       NODE_ENV: production
+      DATABASE_URL: 'postgresql://${POSTGRES_USER:-inkling}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-inkling}?schema=public'
+      REDIS_URL: redis://redis:6379
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,13 +52,15 @@ services:
         condition: service_started
     # 不对外暴露端口；仅 Caddy 经内部网络访问 api:3001
     logging: *default-logging
+    mem_limit: 768m
+    cpus: 1.0
 
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-inkling}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?在 .env 设置强随机密码}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?在 .env 设置强随机密码（仅用字母数字，避免 URL 保留字符）}
       POSTGRES_DB: ${POSTGRES_DB:-inkling}
     volumes:
       - pg-data:/var/lib/postgresql/data
@@ -64,6 +70,8 @@ services:
       timeout: 5s
       retries: 5
     logging: *default-logging
+    mem_limit: 512m
+    cpus: 1.0
 
   redis:
     image: redis:7-alpine
@@ -72,7 +80,10 @@ services:
     volumes:
       - redis-data:/data
     logging: *default-logging
+    mem_limit: 192m
+    cpus: 0.5
 
+# 资源限额为 2C4G 机型保守值：随机型与观测（docker stats）调整；修改后 up -d 生效。
 volumes:
   pg-data:
   redis-data:

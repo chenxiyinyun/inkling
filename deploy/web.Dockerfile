@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # 信逢 Inkling · 边缘镜像（Nuxt SPA 静态产物 + Caddy 同源反代 + 自动 HTTPS）
 # 构建上下文 = 仓库根目录
 ARG NODE_IMAGE=node:22-bookworm-slim

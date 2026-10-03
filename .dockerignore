@@ -22,4 +22,5 @@ coverage
 Thumbs.db
 .idea
 .vscode
+.commandcode
 docs
