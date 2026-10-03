@@ -78,7 +78,11 @@ docker compose -f deploy/docker-compose.prod.yml --env-file .env up -d --build
 ```bash
 pnpm test                    # 单元测试（Vitest，零基建，无需 DB）
 pnpm typecheck               # 全包类型检查
-# 集成 / e2e（需本机 PG+Redis）：pnpm db:deploy && pnpm test:integration
+
+# 集成 / e2e（真 PG + Redis）：
+docker compose up -d                                         # 起 PG16 + Redis7
+docker compose exec -T postgres createdb -U inkling inkling_test   # 一次性：建测试库
+pnpm test:integration        # 自动派生测试库并应用迁移后运行（6 套件 / 30 用例）
 ```
 
 集成测试与镜像构建由 CI 免费档自动执行（GitHub Actions `services:` 容器）。

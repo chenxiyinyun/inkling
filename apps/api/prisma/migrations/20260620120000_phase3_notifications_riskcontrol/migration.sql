@@ -14,7 +14,7 @@ ALTER TABLE "unseal_records" ADD COLUMN     "warnedAt" TIMESTAMP(3);
 -- 直接 ADD COLUMN "publicId" TEXT NOT NULL 在「已有处罚记录」的库上会报 null 值错误导致 migrate deploy 中断）
 ALTER TABLE "penalties" ADD COLUMN     "publicId" TEXT;
 UPDATE "penalties" SET "publicId" = gen_random_uuid()::text WHERE "publicId" IS NULL;
-ALTER TABLE "penalties" SET NOT NULL;
+ALTER TABLE "penalties" ALTER COLUMN "publicId" SET NOT NULL;
 
 -- CreateTable
 CREATE TABLE "appeals" (

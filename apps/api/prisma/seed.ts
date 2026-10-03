@@ -21,9 +21,18 @@ const SEEDS = [
 ];
 
 async function main() {
-  // 防误伤：生产环境拒绝注入弱口令种子账号（确需时显式 ALLOW_SEED=1 并配合 SEED_PASSWORD）。
-  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_SEED !== '1') {
-    throw new Error('[seed] 拒绝在生产环境写入种子账号；如确需，请设 ALLOW_SEED=1 并改用 SEED_PASSWORD。');
+  // 防误伤：生产环境拒绝向「非本机数据库」注入弱口令种子账号（确需时显式 ALLOW_SEED=1）。
+  // 兼容开发机全局设有 NODE_ENV=production 的情况：只要数据库在本机就放行。
+  const dbHost = (() => {
+    try {
+      return new URL(process.env.DATABASE_URL!).hostname;
+    } catch {
+      return '';
+    }
+  })();
+  const isLocalDb = ['localhost', '127.0.0.1', '::1'].includes(dbHost);
+  if (process.env.NODE_ENV === 'production' && !isLocalDb && process.env.ALLOW_SEED !== '1') {
+    throw new Error('[seed] 拒绝在生产环境（非本机数据库）写入种子账号；如确需，请设 ALLOW_SEED=1 并改用 SEED_PASSWORD。');
   }
   const seedPassword = process.env.SEED_PASSWORD ?? 'inkling123';
   const passwordHash = await bcrypt.hash(seedPassword, 10);

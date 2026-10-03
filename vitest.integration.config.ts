@@ -32,6 +32,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['apps/api/test/**/*.e2e.spec.ts'],
+    // 全局前置（仅一次）：确保测试库 schema 与迁移同步（幂等，见该文件注释）
+    globalSetup: ['apps/api/test/global-setup.ts'],
     setupFiles: ['apps/api/test/vitest-env.setup.ts'],
     // 共享单一 DB/Redis：禁用文件级并行，用例间串行 + 每例重置来隔离
     fileParallelism: false,
